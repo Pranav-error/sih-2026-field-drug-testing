@@ -19,69 +19,76 @@ import sys
 import tempfile
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "tests"))
 
 from factory import SimulatedHardwareKeystore          # noqa: E402  (demo-only hardware stub)
+from synth import photograph, render_card               # noqa: E402  (demo-only camera)
 from ftr.canonical_cbor import dumps                    # noqa: E402
 from ftr.chain import Chain                             # noqa: E402
-from ftr.colorimetry import ConformalClassifier, RootPolynomial, _root_poly  # noqa: E402
+from ftr.colorimetry import ConformalClassifier, srgb_to_linear, xyz_to_lab  # noqa: E402
+from ftr.pipeline import SRGB_TO_XYZ_D65, measure       # noqa: E402
 from ftr.record import FTR, SealedRecord, seal          # noqa: E402
 from ftr.verifier import verify_chain, verify_record    # noqa: E402
 
-# Three loci, not two, because that is what a real reagent looks like. Marquis
-# develops similar dark colours for related compounds, so the interesting
-# abstention is between two *positive* classes — not between positive and a
-# blank strip, which are never confusable.
-LOCI = {
-    "opiate_class":     np.array([28.4, 12.1, -9.6]),   # purple-black
-    "amphetamine_class": np.array([34.9, 16.8, -4.1]),  # nearby: 8.6 dE away
-    "negative":         np.array([78.2, -1.4, 6.3]),    # unreacted strip
+# Three well colours standing in for reagent developments. Surrogates, not
+# chemistry: ARCHITECTURE.md §7 explains why a student team cannot lawfully hold
+# the real thing, and why substituting NCB colour standards is a data change
+# rather than an architecture change.
+WELLS = {
+    "opiate_class":      (0.28, 0.12, 0.22),   # purple-black
+    "amphetamine_class": (0.34, 0.20, 0.14),   # brown
+    "negative":          (0.80, 0.78, 0.72),   # unreacted strip
 }
+
+
+def truth_lab(srgb) -> np.ndarray:
+    return xyz_to_lab(srgb_to_linear(np.array(srgb)) @ SRGB_TO_XYZ_D65.T)
+
+
+LOCI = {name: truth_lab(v) for name, v in WELLS.items()}
 
 
 def rule(title: str) -> None:
     print(f"\n\033[1m{title}\033[0m\n" + "=" * len(title))
 
 
-def build_pipeline(rng):
-    """L1 transform solved from a synthetic card, L2 calibrated on a held-out split."""
-    true_M = np.array([[0.41, 0.21, 0.02], [0.36, 0.72, 0.12], [0.18, 0.07, 0.95],
-                       [0.02, 0.01, 0.00], [0.01, 0.02, 0.03], [0.03, 0.00, 0.01]]) * 100
-    dev_rgb = rng.uniform(0.05, 0.95, size=(24, 3))
-    measured_xyz = _root_poly(dev_rgb) @ true_M + rng.normal(0, 0.4, size=(24, 3))
-    transform = RootPolynomial.fit(dev_rgb, measured_xyz)
+def build_classifier(rng) -> ConformalClassifier:
+    """Calibrate L2 on jittered reference points.
 
+    In deployment this split is *physical* — held-out frames captured under an
+    illuminant the model never saw (§7.5). The jitter here stands in for that so
+    the demo runs in a second; it is the one place in this file where a real
+    number is replaced by a plausible one, and it is the reason no accuracy claim
+    from this demo means anything.
+    """
     labs, lbls = [], []
-    for lbl, locus in LOCI.items():
-        labs += [locus + rng.normal(0, 2.6, 3) for _ in range(200)]
-        lbls += [lbl] * 200
+    for name, locus in LOCI.items():
+        labs += [locus + rng.normal(0, 2.2, 3) for _ in range(200)]
+        lbls += [name] * 200
     clf = ConformalClassifier(LOCI, alpha=0.05)
     clf.calibrate(np.array(labs), lbls)
-    return transform, clf
+    return clf
 
 
-def make_record(lab, prediction, transform, frame: bytes, agreeing=4, indicators=()) -> FTR:
+def make_record(m, frame_bytes: bytes, agreeing: int = 4, indicators=()) -> FTR:
+    """Build an FTR from a real Measurement. Colorimetry comes straight from L1."""
+    fields = m.record_fields()
     return FTR(
         captured_at={"device_clock": "2026-09-13T14:32:07+05:30",
                      "uptime_ms": 918_233_004, "trusted_time_delta_ms": None},
         operator={"id": "NCB/BLR/2291", "credential_ref": "cred:2291",
                   "biometric_unlock_used": True},
         kit={"reagent_type": "marquis", "kit_photo_sha256": hashlib.sha256(b"lot").digest()},
-        card={"card_id": "CARD-IN-2026-0417", "print_batch": "B12"},
-        capture={"raw_image_sha256": hashlib.sha256(frame).digest(),
-                 "normalised_image_sha256": hashlib.sha256(frame + b"|norm").digest()},
-        colorimetry={"lab_x100": [int(round(v * 100)) for v in lab],
-                     "calibration_residual_x1000": int(round(transform.residual_delta_e * 1000)),
-                     "blur_metric_x1000": 30, "dynamic_range_x1000": 780},
-        classification={"model_id": "marquis-loci-v3",
-                        "model_sha256": hashlib.sha256(b"marquis-loci-v3").digest(),
-                        "alpha_x1000": int(round(prediction.alpha * 1000)),
-                        "prediction_set": list(prediction.prediction_set),
-                        "label": prediction.label,
-                        "threshold_x1000": int(round(prediction.threshold * 1000))},
+        card={"card_id": "CARD-IN-2026-0417", "print_batch": "B12",
+              "values": "nominal — no spectrophotometer reading for this batch"},
+        capture={"raw_image_sha256": hashlib.sha256(frame_bytes).digest(),
+                 "normalised_image_sha256": hashlib.sha256(frame_bytes + b"|norm").digest()},
+        colorimetry=fields["colorimetry"],
+        classification=fields.get("classification", {"measured": False}),
         location_bundle={"lat_x1e7": 129912000, "lon_x1e7": 777205000, "accuracy_m": 6,
                          "gnss_raw_digest": hashlib.sha256(b"gnss").digest(),
                          "wifi_bssid_set_digest": hashlib.sha256(b"wifi").digest(),
@@ -105,42 +112,56 @@ def main() -> int:
     workdir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(2026)
 
-    rule("L1/L2 — calibrate the instrument")
-    transform, clf = build_pipeline(rng)
-    print(f"  colour transform residual   {transform.residual_delta_e:6.3f} dE2000 "
-          f"(gate {'PASS' if transform.passes() else 'FAIL'} at 3.000)")
-    print(f"  worst patch                 {transform.max_delta_e:6.3f} dE2000")
+    rule("L2 — calibrate the abstention threshold")
+    clf = build_classifier(rng)
     print(f"  conformal threshold         {clf.threshold:6.3f} dE2000 "
-          f"from {clf.n_calibration} held-out points at alpha={clf.alpha}")
+          f"from {clf.n_calibration} points at alpha={clf.alpha}")
+    print(f"  reference loci              " +
+          ", ".join(f"{k} L*{v[0]:.0f}" for k, v in LOCI.items()))
 
-    rule("Three measurements — one call, two different abstentions")
+    rule("L1 — photograph three strips, in three different conditions")
     keystore = SimulatedHardwareKeystore(workdir / "strongbox.pem")
     chain = Chain(workdir / "chain")
-    frames = []
+    frames: list[bytes] = []
 
     scenarios = [
-        ("clean strip", LOCI["opiate_class"] + np.array([0.9, -0.6, 0.4])),
-        ("between classes", (LOCI["opiate_class"] + LOCI["amphetamine_class"]) / 2),
-        ("nothing like it", np.array([55.0, -60.0, 70.0])),
+        ("opiate, good light", "opiate_class", dict(illuminant="daylight")),
+        ("amphetamine, shadow", "amphetamine_class", dict(illuminant="shade", shadow=0.6, tilt=12)),
+        ("opiate, torch glare", "opiate_class", dict(illuminant="torch", glare=0.25)),
     ]
-    for name, lab in scenarios:
-        p = clf.predict(lab)
-        frame = f"synthetic sensor frame: {name}".encode()
+
+    for name, well, conditions in scenarios:
+        photo = photograph(render_card(well_srgb=WELLS[well]), rng=rng, **conditions)
+        ok, buf = cv2.imencode(".jpg", photo, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        frame = buf.tobytes()
         frames.append(frame)
-        verdict = p.label if p.label else "INCONCLUSIVE"
-        pset = ", ".join(p.prediction_set) or "\u2205"
-        print(f"  {name:<16} Lab* {lab[0]:6.1f} {lab[1]:6.1f} {lab[2]:6.1f}"
-              f"   set {{{pset}}}  ->  {verdict}")
-        print(f"  {'':<16} {p.reason}")
-        rec = seal(make_record(lab, p, transform, frame), chain.head(), chain.next_sequence(), keystore)
+
+        m = measure(cv2.imdecode(np.frombuffer(frame, np.uint8), cv2.IMREAD_COLOR), clf)
+
+        print(f"  {name}")
+        if m.lab is not None:
+            print(f"    measured Lab*   {m.lab[0]:6.1f} {m.lab[1]:6.1f} {m.lab[2]:6.1f}"
+                  f"   (truth {LOCI[well][0]:.1f} {LOCI[well][1]:.1f} {LOCI[well][2]:.1f})")
+            print(f"    card residual   {m.transform_residual_delta_e:.3f} dE   "
+                  f"illumination {m.illumination_residual_stops:.3f} stops   "
+                  f"gate {'PASS' if m.quality.passed else 'FAIL'}")
+        if m.usable:
+            p = m.prediction
+            pset = ", ".join(p.prediction_set) or "\u2205"
+            print(f"    result          {{{pset}}}  ->  {p.label or 'INCONCLUSIVE'}")
+        else:
+            print(f"    result          REFUSED — {m.refusals[0]}")
+            print(f"    operator sees   \"{m.guidance()}\"")
+
+        rec = seal(make_record(m, frame), chain.head(), chain.next_sequence(), keystore)
         chain.append(rec)
-        print(f"  {'':<16} sealed #{rec.sequence} digest {rec.digest.hex()[:32]}…\n")
+        print(f"    sealed          #{rec.sequence}  {rec.digest.hex()[:32]}...\n")
 
     chain.anchor(0)
-    print(f"  anchored up to #0; {chain.status().unanchored} record(s) still in the open window")
-    print("  note: the abstentions are sealed and chained exactly like the call. "
-          "An inconclusive\n        result is evidence too, and deleting it is the "
-          "attack the ledger exists to stop.")
+    print(f"  anchored up to #0; {chain.status().unanchored} record(s) in the open window")
+    print("  note: the refusal was sealed and chained exactly like the two results.")
+    print("        A frame the instrument would not read is evidence too, and deleting")
+    print("        it is the attack the ledger exists to stop.")
 
     rule("Independent verifier — the honest chain")
     print(verify_chain(chain.root).text())

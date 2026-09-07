@@ -30,7 +30,8 @@ Working documents for Smart India Hackathon 2026.
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo   # end-to-end, then four attacks
-.venv/bin/python -m pytest core -q
+.venv/bin/python -m pytest core -q                  # 123 tests
+.venv/bin/python -m ftr.printable --out card.png    # print a reference card
 ```
 
 ## The one-paragraph version
@@ -49,11 +50,11 @@ No new hardware. A printed colour card and a phone.
 | Track | State |
 |---|---|
 | C — crypto / provenance | **Implemented.** `core/ftr`: canonical CBOR, FTR, hash chain, verifier, `ftrverify` CLI. |
-| A — colour pipeline | **Partial.** Device transform and CIEDE2000 done and tested; fiducial detection and homography not started (needs OpenCV). |
+| A — colour pipeline | **Implemented.** Fiducial detection, homography, illumination correction, patch sampling, quality gate, device transform. Worst error on an accepted frame: 0.76 dE2000 — on synthetic frames only. |
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
 | D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. |
 | E — legal / statutory | Not started. Blocked on transcribing the BSA §63 Schedule from the bare Act. |
-| F — data | **Not started, and it is the critical path.** No surrogate ladders captured yet. |
+| F — data | **Not started, and it is the critical path.** The reference card is now printable (`python -m ftr.printable`); no physical card has been photographed yet. |
 
 Track F cannot be compressed by working harder in the last 48 hours. It is the one to start next.
 

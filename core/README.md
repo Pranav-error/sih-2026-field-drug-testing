@@ -7,11 +7,15 @@ The classifier is not the product. The record is. This package is the record.
 
 ```
 ftr/
+  card.py             the printed reference card: geometry and nominal colour
+  printable.py        renders it at print resolution — python -m ftr.printable
+  detect.py           L1 front half: fiducials, homography, INUC, sampling, gate
+  colorimetry.py      L1 back half + L2: device transform, CIEDE2000, conformal
+  pipeline.py         one frame in, one measurement out — the code the verifier re-runs
   canonical_cbor.py   deterministic encoding — the digest is the legal artefact
   record.py           the Field Test Record, sealing, the envelope
   chain.py            append-only device ledger, anchoring window
   signing.py          keystore abstraction + attestation, honest about its level
-  colorimetry.py      L1 device transform, L2 conformal abstention
   verifier.py         proven / asserted / unverifiable
   cli.py              ftrverify
 ```
@@ -21,13 +25,21 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 81 tests
+.venv/bin/python -m pytest core                        # 123 tests
 ```
 
-`demo.py` builds a three-record chain from synthetic colorimetry, verifies it, then
-runs four rows of the adversary matrix (§10) live: image edit, result rewrite,
-mid-chain deletion, and head truncation — the last of which it *fails to catch*,
-and says so.
+`demo.py` photographs three synthetic strips under three different lighting
+conditions, runs each through the real L1/L2 pipeline, seals all three into a
+chain — including the one the instrument **refuses to read** — verifies the chain,
+then runs four rows of the adversary matrix (§10) live: image edit, result
+rewrite, mid-chain deletion, and head truncation. The last of these it *fails to
+catch*, and says so.
+
+Print a card:
+
+```sh
+.venv/bin/python -m ftr.printable --out card.png --serial 0417 --batch B12
+```
 
 Verify a chain yourself, offline, trusting nothing:
 
@@ -36,6 +48,53 @@ Verify a chain yourself, offline, trusting nothing:
 .venv/bin/python -m ftr.cli record /tmp/ftr-demo/chain/000000.ftr \
     --image raw_image_sha256=frame.jpg
 ```
+
+## What L1 actually achieves
+
+Measured on the synthetic capture matrix (`tests/synth.py`), against a known
+ground-truth well colour:
+
+| Condition | Error, no INUC | Error, with INUC | Gate |
+|---|---|---|---|
+| ideal | 0.31 | 0.46 | pass |
+| open shade | 0.13 | 0.37 | pass |
+| fluorescent | 0.57 | 0.64 | pass |
+| underexposed ×0.55 | 0.38 | 0.52 | pass |
+| shadow across card, 0.55 | 1.82 | **0.40** | pass |
+| hard shadow, 0.75 | 2.95 | **0.53** | pass |
+| shadow + shade + JPEG + noise | 1.43 | **0.76** | pass |
+| torch hotspot | 22.85 | 18.25 | **reject** |
+| very blurry | — | — | **reject** |
+| far too dark | — | — | **reject** |
+| tilt 32° | — | — | **reject** |
+
+dE2000. The claim is not "the pipeline is accurate" — it is:
+
+> **The worst error on any frame the gate accepted is 0.76 dE2000.** Every frame
+> carrying a large error was rejected, with guidance naming what to move.
+
+That is the property `test_frames_the_gate_accepts_are_accurate` enforces, and it
+is the only one worth stating in a submission. These are synthetic frames: real
+ink, real paper gloss and a real ISP will be worse. The number to quote at the
+finale comes from the physical capture matrix, not from here.
+
+## Two things testing changed about the design
+
+**The card had a latent measurement bug.** All six neutral patches sat on one row,
+so the bi-quadratic illumination surface was unconstrained in *y* and could not
+see a shadow or hotspot above or below that line. A torch hotspot passed the
+quality gate carrying a **52 dE** error. The neutrals now ring the colour field at
+three rows and five columns, and `test_neutrals_span_the_card_in_both_axes` stops
+that regressing. A layout mistake here is a silent measurement error everywhere
+downstream — which is exactly the class of bug a colour chart is supposed to
+prevent.
+
+**INUC was competing with the device transform.** Fitted naively, the illumination
+surface absorbed the *global* illuminant gain, which the root-polynomial transform
+already handles properly using all 23 patches instead of 8 neutrals. The surface
+is now mean-normalised over the card so it corrects only *spatial* variation.
+Conceding the global term costs nothing; competing for it cost ~1.5 dE under a
+coloured illuminant.
 
 ## Five decisions worth defending
 
@@ -82,7 +141,7 @@ rather than trusting the construction.
 | Gap | Status |
 |---|---|
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
-| Fiducial detection / homography | Not implemented — needs OpenCV. The transform math is here and tested; the card *finder* is not. |
+| Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path.** |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
 | BSA §63 certificate emitter | L6 not started; blocked on transcribing the Schedule from the bare Act. |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
@@ -90,7 +149,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-81 tests. The ones that matter most:
+123 tests. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.
@@ -99,3 +158,7 @@ rather than trusting the construction.
   `test_a_location_disagreement_is_recorded_not_suppressed`.
 - `test_colorimetry.py` — CIEDE2000 against the Sharma et al. conformance data,
   and the conformal coverage guarantee measured over 800 trials.
+- `test_detect.py` — the capture matrix: what the gate accepts must be accurate,
+  what would mislead must be rejected, and
+  `test_the_printable_card_is_detectable_after_a_camera_round_trip` closes the
+  loop between the card we print and the card we detect.
