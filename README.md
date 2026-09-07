@@ -19,15 +19,17 @@ Working documents for Smart India Hackathon 2026.
   inventive steps, and the §3(k) patentability problem.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — interface spec: tokens, the seven rules every screen obeys,
   per-screen behaviour, accessibility.
+- [`docs/DETERMINISM.md`](docs/DETERMINISM.md) — what "reproduces bit-for-bit" is allowed to mean,
+  measured across the two implementations rather than assumed.
 - [`docs/app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype with the
   rationale beside each screen.
 
 ## Code
 
 - [`core/`](core/README.md) — `ftr`, the evidentiary core: canonical CBOR, the Field Test Record,
-  the append-only ledger, the colorimetry pipeline, and the independent verifier. 165 tests.
+  the append-only ledger, the colorimetry pipeline, and the independent verifier. 166 tests.
 - [`dart/ftr_verify/`](dart/ftr_verify/README.md) — the **second** verifier, written independently
-  in Dart with no shared code or dependencies. 44 tests, reading vectors the Python side wrote.
+  in Dart with no shared code or dependencies. 65 tests, reading vectors the Python side wrote.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]

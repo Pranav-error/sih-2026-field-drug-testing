@@ -26,7 +26,7 @@ match exactly is the verdict and the digest.
 
 ```sh
 dart pub get
-dart test                                        # 44 tests
+dart test                                        # 65 tests
 dart run bin/ftrverify.dart chain  /path/to/chain
 dart run bin/ftrverify.dart record /path/to/000000.ftr --image raw_image_sha256=frame.jpg
 ```
@@ -59,11 +59,33 @@ If a change to either encoder makes the committed bytes stop matching, that is t
 contract working. The digest is what a §63 certificate has to state; it is worth
 stating only because two separately written encoders reach it.
 
+## Colorimetry, and what agreement bought
+
+`lib/src/colorimetry.dart` is the second implementation of L1's device transform
+and L2's conformal abstention — written from the specification, and deliberately
+solving least squares by the normal equations rather than numpy's SVD, so the
+verifier does not inherit the other implementation's numerics.
+
+Measured divergence on the shared vectors:
+
+| Quantity | Worst |
+|---|---|
+| sRGB → CIELAB | 5.5 × 10⁻¹⁴ |
+| CIEDE2000 | 1.0 × 10⁻¹⁴ |
+| Transform matrix coefficient | 3.1 × 10⁻¹¹ |
+| Conformal threshold | 8.9 × 10⁻¹⁶ |
+| **Stored `lab_x100` integers** | **0** |
+
+The doubles do not agree bit-for-bit and never will. The *stored* values agree
+exactly, because every measured field is a scaled integer and the divergence sits
+eleven orders of magnitude below the coarsest quantum. That is what the record is
+allowed to claim, and [`../../docs/DETERMINISM.md`](../../docs/DETERMINISM.md)
+works through why the stronger-sounding original wording was not defensible.
+
 ## Not implemented here
 
-The Dart verifier checks encoding, digest, signature, attestation fields and the
-chain. It does **not** re-run L1/L2 from the raw frame — that requires the colour
-pipeline, which lives in Python and in the Flutter app's native path. Until it
-does, a record verified only by this implementation has had its integrity checked
-but not its *result* reproduced, and the report says so by omission rather than
-claiming otherwise.
+This package cannot **find the card in a photograph** — fiducial detection,
+homography and illumination correction need OpenCV, which lives in Python and in
+the Flutter app's native path. So it reproduces a measurement from sampled patch
+values, not from a raw frame. A record verified only here has had its integrity
+checked and its classification re-derived, but not its *image* re-read.

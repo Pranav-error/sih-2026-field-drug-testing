@@ -25,7 +25,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 165 tests
+.venv/bin/python -m pytest core                        # 166 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -146,11 +146,11 @@ rather than trusting the construction.
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
 | BSA §63 certificate emitter | L6 not started; blocked on transcribing the Schedule from the bare Act. |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
-| Dart implementation | **Done** — `dart/ftr_verify`. It does not yet re-run L1/L2 from the raw frame, so it checks integrity but does not reproduce the *result*. |
+| Dart implementation | **Done** — `dart/ftr_verify`, including L1's colour transform and L2. It cannot yet find the card in a photograph (ArUco is native), so it reproduces a *measurement* but not yet a *frame*. |
 
 ## Test suite
 
-165 Python tests, plus 44 in Dart. The ones that matter most:
+166 Python tests, plus 65 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.

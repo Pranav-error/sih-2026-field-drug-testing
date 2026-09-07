@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 
 echo "== regenerating cross-implementation vectors =="
 .venv/bin/python core/tools/gen_vectors.py
+.venv/bin/python core/tools/gen_colorimetry_vectors.py
 
 echo
 echo "== python =="

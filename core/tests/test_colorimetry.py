@@ -239,3 +239,35 @@ def test_calibration_refuses_too_few_points_for_the_stated_alpha():
 def test_predicting_before_calibrating_is_an_error():
     with pytest.raises(RuntimeError, match="not calibrated"):
         ConformalClassifier(LOCI).predict(np.array([50.0, 0.0, 0.0]))
+
+
+def test_loci_closer_than_the_threshold_can_never_yield_a_singleton():
+    """A statement about the reagent, not about the software.
+
+    If two substance classes develop colours closer together than the calibrated
+    threshold, the classifier must always return both and report inconclusive.
+    Lowering the threshold to make the output look decisive would be discarding
+    the coverage guarantee — the one thing that makes the result defensible.
+    See docs/DETERMINISM.md.
+    """
+    near = {
+        "class_a": np.array([18.4, 23.2, -7.5]),
+        "class_b": np.array([22.1, 20.4, -4.8]),   # about 5 dE away
+    }
+    separation = float(delta_e_2000(near["class_a"], near["class_b"]))
+
+    rng = np.random.default_rng(17)
+    labs, lbls = [], []
+    for lbl, locus in near.items():
+        labs += [locus + rng.normal(0, 2.4, 3) for _ in range(300)]
+        lbls += [lbl] * 300
+    clf = ConformalClassifier(near, alpha=0.05)
+    threshold = clf.calibrate(np.array(labs), lbls)
+
+    assert threshold > separation, (
+        "this test is only meaningful when the loci are closer than the threshold"
+    )
+    for locus in near.values():
+        p = clf.predict(locus)
+        assert p.inconclusive, "sitting exactly on a locus must still abstain"
+        assert set(p.prediction_set) == set(near), "both classes remain admissible"
