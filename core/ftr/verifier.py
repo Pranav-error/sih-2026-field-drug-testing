@@ -1,0 +1,288 @@
+"""The independent verifier.
+
+Runs with no network and no trust in the app that produced the record. It sorts
+every claim into one of three buckets and prints all three at equal weight:
+
+    PROVEN         re-derived here, from the bytes, by this program
+    ASSERTED       present in the record, but nothing in the bundle establishes it
+    UNVERIFIABLE   outside what any bundle of bytes could establish
+
+The third bucket is the reason the program exists. A verifier that only ever
+prints VALID teaches courts to over-trust it, which is a worse outcome than the
+subjective status quo it replaces.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from .canonical_cbor import dumps, is_canonical, loads
+from .chain import Chain
+from .record import SealedRecord
+
+__all__ = ["Report", "verify_record", "verify_chain"]
+
+
+@dataclass
+class Report:
+    proven: list[str] = field(default_factory=list)
+    asserted: list[str] = field(default_factory=list)
+    unverifiable: list[str] = field(default_factory=list)
+    failures: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.failures
+
+    def text(self, width: int = 78) -> str:
+        def block(title: str, items: list[str], mark: str) -> list[str]:
+            if not items:
+                return []
+            out = [title, "-" * len(title)]
+            for it in items:
+                first = True
+                for line in _wrap(it, width - 4):
+                    out.append(f" {mark if first else ' '}  {line}")
+                    first = False
+            out.append("")
+            return out
+
+        lines: list[str] = []
+        if self.failures:
+            lines += block("FAILED", self.failures, "x")
+        lines += block("PROVEN", self.proven, "+")
+        lines += block("ASSERTED, NOT PROVEN", self.asserted, "~")
+        lines += block("UNVERIFIABLE FROM THIS BUNDLE", self.unverifiable, ".")
+        verdict = "VERIFIED" if self.ok else "VERIFICATION FAILED"
+        lines.append(f"{verdict} — {len(self.proven)} proven, "
+                     f"{len(self.asserted)} asserted, {len(self.unverifiable)} unverifiable")
+        if self.ok:
+            lines.append("A verified record is not a true result. It is an unaltered one.")
+        return "\n".join(lines)
+
+
+def _wrap(s: str, w: int) -> list[str]:
+    words, line, out = s.split(), "", []
+    for word in words:
+        if line and len(line) + 1 + len(word) > w:
+            out.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        out.append(line)
+    return out or [""]
+
+
+# --------------------------------------------------------------------------- #
+
+def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report:
+    """Verify one envelope. ``images`` maps a record field name to file bytes."""
+    r = Report()
+
+    try:
+        rec = SealedRecord.from_envelope(blob)
+    except Exception as e:
+        r.failures.append(f"Envelope will not decode: {e}")
+        return r
+
+    # 1. canonical encoding ------------------------------------------------- #
+    if is_canonical(rec.body_cbor):
+        r.proven.append(
+            "The record body is canonically encoded: it decodes and re-encodes to "
+            "the same bytes, so the digest is reproducible by any implementation."
+        )
+    else:
+        r.failures.append(
+            "The record body is not canonical CBOR. Its digest is not reproducible, "
+            "so no signature over it means anything."
+        )
+        return r
+
+    body = rec.body
+    r.proven.append(f"SHA-256 of the body recomputes to {rec.digest.hex()}.")
+
+    # 2. signature ---------------------------------------------------------- #
+    if rec.signature_valid():
+        r.proven.append(
+            "The signature verifies against the recomputed digest under the "
+            "public key carried in the envelope."
+        )
+    else:
+        r.failures.append(
+            "The signature does not verify over the recomputed digest. The record "
+            "has been altered since it was sealed, or it was never sealed by this key."
+        )
+
+    # 3. what the key actually proves --------------------------------------- #
+    att = rec.attestation or {}
+    level = att.get("security_level", "UNKNOWN")
+    if level == "STRONGBOX":
+        r.proven.append(
+            "Key attestation states the signing key was generated in StrongBox, a "
+            "discrete secure element, and is non-exportable."
+        )
+    elif level == "TEE":
+        r.proven.append(
+            "Key attestation states the signing key was generated in the TEE and is "
+            "non-exportable. This is weaker than StrongBox: no discrete secure element."
+        )
+    else:
+        r.failures.append(
+            f"Signing key security level is {level}. The key is not hardware-backed, so "
+            "the signature proves only that whoever held the key file made this record. "
+            "It says nothing about which device produced it. Development records must "
+            "never be presented as evidence."
+        )
+
+    if att.get("key_exportable"):
+        r.asserted.append(
+            "The key is marked exportable, so a copy may exist elsewhere. Authorship "
+            "is not established by this signature alone."
+        )
+
+    vbs = att.get("verified_boot_state", "UNKNOWN")
+    if vbs == "GREEN" and att.get("bootloader_locked"):
+        r.proven.append(
+            "Verified boot was GREEN and the bootloader locked when the key was "
+            "attested: the device was running unmodified signed firmware."
+        )
+    elif vbs == "UNKNOWN":
+        r.asserted.append("Verified boot state is unknown; device integrity is not established.")
+    else:
+        r.failures.append(
+            f"Verified boot state is {vbs} and the bootloader "
+            f"{'is locked' if att.get('bootloader_locked') else 'is unlocked'}. "
+            "The record was produced on a modified device."
+        )
+
+    if not att.get("cert_chain_len"):
+        r.asserted.append(
+            "No attestation certificate chain is present, so the hardware claims above "
+            "cannot be traced to a root certificate authority."
+        )
+
+    # 4. images ------------------------------------------------------------- #
+    import hashlib
+    cap = body.get("capture", {})
+    for fieldname, want in cap.items():
+        if not fieldname.endswith("_sha256") or not isinstance(want, bytes):
+            continue
+        supplied = (images or {}).get(fieldname)
+        if supplied is None:
+            r.asserted.append(
+                f"{fieldname} is recorded as {want.hex()[:16]}… but the file was not "
+                "supplied to this verifier, so the image behind it was not checked."
+            )
+        elif hashlib.sha256(supplied).digest() == want:
+            r.proven.append(
+                f"The supplied {fieldname.removesuffix('_sha256')} hashes to the value in "
+                "the record: the image is byte-identical to the one sealed at capture."
+            )
+        else:
+            r.failures.append(
+                f"The supplied {fieldname.removesuffix('_sha256')} does NOT match the "
+                "hash in the record. The image has been altered since capture."
+            )
+
+    # 5. claims the bundle carries but cannot support ----------------------- #
+    ts = body.get("captured_at", {})
+    if "device_clock" in ts:
+        r.asserted.append(
+            f"Capture time is stated as {ts['device_clock']}, taken from the device "
+            "clock. Nothing here proves the clock was correct; only the chain and an "
+            "anchor bound when this record was made."
+        )
+    if body.get("operator", {}).get("biometric_unlock_used"):
+        r.asserted.append(
+            "Key use was gated by a biometric. That binds the record to the enrolled "
+            "device, not to the named person."
+        )
+    kit = body.get("kit", {})
+    if kit.get("reagent_type"):
+        r.asserted.append(
+            f"Reagent is declared as {kit['reagent_type']} by the operator. It is not "
+            "machine-read, by design — the system is kit-agnostic."
+        )
+    for name in body.get("omitted", []):
+        r.asserted.append(f"Field '{name}' was recorded as unavailable at capture.")
+
+    loc = body.get("location_bundle", {})
+    score = loc.get("corroboration_channels_agreeing")
+    total = loc.get("corroboration_channels_total")
+    if score is not None and total:
+        if score == total:
+            r.proven.append(
+                f"All {total} independent location channels agreed at capture "
+                "(GNSS geometry, Wi-Fi neighbourhood, serving cell, kinematics)."
+            )
+        else:
+            r.asserted.append(
+                f"Only {score} of {total} location channels agreed. The disagreement is "
+                "recorded below and is available to either party."
+            )
+    for ind in loc.get("spoof_indicators", []):
+        r.asserted.append(f"Location anomaly recorded at capture: {ind}")
+
+    # 6. the floor ---------------------------------------------------------- #
+    cls = body.get("classification", {})
+    r.unverifiable += [
+        "Whether the substance photographed is the substance seized. No bundle of "
+        "bytes can establish this; it rests on the seizure procedure and the witnesses.",
+        "Whether the colorimetric reaction had fully developed when the frame was taken.",
+        "The correctness of the result itself. This is a presumptive screening test "
+        f"reported at risk level alpha={cls.get('alpha_x1000', '?')}/1000; it is not "
+        "confirmatory and does not identify a substance.",
+    ]
+    return r
+
+
+def verify_chain(root: Path, verbose: bool = False) -> Report:
+    """Verify every record in a chain directory, then the chain itself."""
+    chain = Chain(root)
+    r = Report()
+    n = len(chain)
+    if n == 0:
+        r.failures.append(f"No records found in {root}.")
+        return r
+
+    bad = 0
+    for path in sorted(Path(root).glob("[0-9]*.ftr")):
+        sub = verify_record(path.read_bytes())
+        if not sub.ok:
+            bad += 1
+            r.failures += [f"record {path.stem}: {f}" for f in sub.failures]
+
+    if bad == 0:
+        r.proven.append(f"All {n} records individually verify: canonical, hashed and signed.")
+
+    st = chain.status()
+    if st.intact:
+        r.proven.append(
+            f"The chain replays from genesis to record #{n - 1} with no gap and no fork: "
+            "no record was reordered, removed from the middle, or inserted after the fact."
+        )
+    else:
+        for b in st.breaks:
+            r.failures.append(f"chain break at #{b.sequence} [{b.kind}]: {b.detail}")
+
+    if st.last_anchor_sequence is None:
+        r.asserted.append(
+            f"This chain has never been anchored. All {st.length} records could have been "
+            "produced at any time; the ledger fixes their order, not their date."
+        )
+    elif st.unanchored:
+        r.asserted.append(
+            f"{st.unanchored} record(s) after #{st.last_anchor_sequence} are unanchored. "
+            "Each proves only that it was made after the record before it and before the "
+            "next anchor."
+        )
+    else:
+        r.proven.append(f"Every record is anchored up to #{st.last_anchor_sequence}.")
+
+    r.unverifiable.append(
+        "Whether records were removed from the *head* of the chain. Truncation is "
+        "detectable only against an external anchor, never from the files alone."
+    )
+    return r

@@ -1,0 +1,18 @@
+[project]
+name = "ftr"
+version = "0.1.0"
+description = "Field Test Record — evidentiary core for SIH26231 field drug testing"
+requires-python = ">=3.10"
+dependencies = ["cryptography>=42", "numpy>=1.24"]
+
+[project.optional-dependencies]
+# The verifier deliberately needs neither of these. Only L1/L2 use numpy, and
+# only the signing path uses cryptography; a challenger checking canonical
+# encoding and the hash chain needs nothing but the standard library.
+dev = ["pytest>=8"]
+
+[project.scripts]
+ftrverify = "ftr.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
