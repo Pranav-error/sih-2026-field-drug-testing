@@ -17,6 +17,9 @@ Layers, as numbered in docs/ARCHITECTURE.md:
     L5  chain.Chain                     append-only ledger, anchoring window
     L7  verifier.verify_record          proven / asserted / unverifiable
 
+    ingest.survey / ingest.calibrate    track F: is this capture set usable, and
+                                        what does it generalise to?
+
 ``pipeline`` and ``detect`` need OpenCV and numpy. The verifier's integrity checks
 — canonical encoding, digest, chain replay — deliberately do not, so a challenger
 can run them with nothing but the standard library.

@@ -21,13 +21,16 @@ Working documents for Smart India Hackathon 2026.
   per-screen behaviour, accessibility.
 - [`docs/DETERMINISM.md`](docs/DETERMINISM.md) — what "reproduces bit-for-bit" is allowed to mean,
   measured across the two implementations rather than assumed.
+- [`docs/CAPTURE.md`](docs/CAPTURE.md) — the capture protocol for track F, and the only accuracy
+  claim worth making.
 - [`docs/app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype with the
   rationale beside each screen.
 
 ## Code
 
 - [`core/`](core/README.md) — `ftr`, the evidentiary core: canonical CBOR, the Field Test Record,
-  the append-only ledger, the colorimetry pipeline, and the independent verifier. 166 tests.
+  the append-only ledger, the colorimetry pipeline, the capture tooling, and the independent
+  verifier. 180 tests.
 - [`dart/ftr_verify/`](dart/ftr_verify/README.md) — the **second** verifier, written independently
   in Dart with no shared code or dependencies. 65 tests, reading vectors the Python side wrote.
 
@@ -60,7 +63,7 @@ No new hardware. A printed colour card and a phone.
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
 | D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. The in-app verifier (Dart) exists. |
 | E — legal / statutory | Not started. Blocked on transcribing the BSA §63 Schedule from the bare Act. |
-| F — data | **Not started, and it is the critical path.** The reference card is now printable (`python -m ftr.printable`); no physical card has been photographed yet. |
+| F — data | **Not started, and it is the critical path.** Card is printable and the ingest tooling is built (`ftr.ingest survey` / `calibrate`, see `docs/CAPTURE.md`); no physical card has been photographed yet. |
 
 Track F cannot be compressed by working harder in the last 48 hours. It is the one to start next.
 

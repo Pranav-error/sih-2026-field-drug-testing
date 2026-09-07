@@ -12,6 +12,7 @@ ftr/
   detect.py           L1 front half: fiducials, homography, INUC, sampling, gate
   colorimetry.py      L1 back half + L2: device transform, CIEDE2000, conformal
   pipeline.py         one frame in, one measurement out — the code the verifier re-runs
+  ingest.py           track F: survey a capture set, calibrate on a held-out illuminant
   canonical_cbor.py   deterministic encoding — the digest is the legal artefact
   record.py           the Field Test Record, sealing, the envelope
   chain.py            append-only device ledger, anchoring window
@@ -25,7 +26,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 166 tests
+.venv/bin/python -m pytest core                        # 180 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -142,7 +143,7 @@ rather than trusting the construction.
 | Gap | Status |
 |---|---|
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
-| Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path.** |
+| Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
 | BSA §63 certificate emitter | L6 not started; blocked on transcribing the Schedule from the bare Act. |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
@@ -150,7 +151,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-166 Python tests, plus 65 in Dart. The ones that matter most:
+180 Python tests, plus 65 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.
