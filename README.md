@@ -17,6 +17,21 @@ Working documents for Smart India Hackathon 2026.
   three-week build plan.
 - [`docs/NOVELTY.md`](docs/NOVELTY.md) — prior-art survey, what is *not* novel, the three candidate
   inventive steps, and the §3(k) patentability problem.
+- [`docs/DESIGN.md`](docs/DESIGN.md) — interface spec: tokens, the seven rules every screen obeys,
+  per-screen behaviour, accessibility.
+- [`docs/app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype with the
+  rationale beside each screen.
+
+## Code
+
+- [`core/`](core/README.md) — `ftr`, the evidentiary core: canonical CBOR, the Field Test Record,
+  the append-only ledger, the colorimetry pipeline, and the independent verifier. 81 tests.
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e core[dev]
+.venv/bin/python core/demo.py --keep /tmp/ftr-demo   # end-to-end, then four attacks
+.venv/bin/python -m pytest core -q
+```
 
 ## The one-paragraph version
 
@@ -31,7 +46,18 @@ No new hardware. A printed colour card and a phone.
 
 ## Status
 
-Research and design only. No code yet. Open questions are listed at the end of `ARCHITECTURE.md`.
+| Track | State |
+|---|---|
+| C — crypto / provenance | **Implemented.** `core/ftr`: canonical CBOR, FTR, hash chain, verifier, `ftrverify` CLI. |
+| A — colour pipeline | **Partial.** Device transform and CIEDE2000 done and tested; fiducial detection and homography not started (needs OpenCV). |
+| B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
+| D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. |
+| E — legal / statutory | Not started. Blocked on transcribing the BSA §63 Schedule from the bare Act. |
+| F — data | **Not started, and it is the critical path.** No surrogate ladders captured yet. |
+
+Track F cannot be compressed by working harder in the last 48 hours. It is the one to start next.
+
+Open questions are listed at the end of `ARCHITECTURE.md`.
 
 ## Sources
 
