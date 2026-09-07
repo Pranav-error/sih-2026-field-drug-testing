@@ -1,0 +1,1066 @@
+<title>Field Companion Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ground:#F7F6F9;
+  --surface:#FFFFFF;
+  --surface-2:#F0EEF4;
+  --ink:#1A1726;
+  --ink-2:#413A55;
+  --muted:#6A6478;
+  --rule:#DEDAE7;
+  --rule-soft:#EAE7F0;
+  --accent:#6B3FA0;
+  --accent-soft:#EDE6F6;
+  --amber:#A66A00;
+  --amber-soft:#F8EEDC;
+  --teal:#0F7B6C;
+  --teal-soft:#DFF0EC;
+  --crimson:#A32C4A;
+  --crimson-soft:#F8E4E9;
+
+  --shell:#231E33;
+  --shell-rule:#3A3350;
+  --screen:#FBFAFD;
+  --view:#16131F;
+  --on-accent:#FFFFFF;
+
+  --f-ui:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --f-body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --f-mono:'IBM Plex Mono','SF Mono',Menlo,monospace;
+
+  --pad:clamp(1.1rem,4vw,2rem);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#141220;
+    --surface:#1C1928;
+    --surface-2:#242032;
+    --ink:#ECEAF2;
+    --ink-2:#C4BED4;
+    --muted:#948CA8;
+    --rule:#312C42;
+    --rule-soft:#272338;
+    --accent:#B392E4;
+    --accent-soft:#2A2140;
+    --amber:#E3AA4E;
+    --amber-soft:#332813;
+    --teal:#5CC5B2;
+    --teal-soft:#12302C;
+    --crimson:#E8879E;
+    --crimson-soft:#361A24;
+    --shell:#0C0A14;
+    --shell-rule:#2A2438;
+    --screen:#1A1726;
+    --view:#0A0810;
+    --on-accent:#140F1E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141220;
+  --surface:#1C1928;
+  --surface-2:#242032;
+  --ink:#ECEAF2;
+  --ink-2:#C4BED4;
+  --muted:#948CA8;
+  --rule:#312C42;
+  --rule-soft:#272338;
+  --accent:#B392E4;
+  --accent-soft:#2A2140;
+  --amber:#E3AA4E;
+  --amber-soft:#332813;
+  --teal:#5CC5B2;
+  --teal-soft:#12302C;
+  --crimson:#E8879E;
+  --crimson-soft:#361A24;
+  --shell:#0C0A14;
+  --shell-rule:#2A2438;
+  --screen:#1A1726;
+  --view:#0A0810;
+  --on-accent:#140F1E;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--f-body);font-size:1.0313rem;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--f-ui);margin:0;line-height:1.16;letter-spacing:-0.015em;text-wrap:balance;}
+p{margin:0;}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px;}
+.wide{max-width:min(1240px,94vw);margin:0 auto;padding:0 var(--pad);}
+.eyebrow{
+  font-family:var(--f-mono);font-size:0.68rem;font-weight:600;
+  letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);
+}
+
+/* ---------- masthead ---------- */
+.masthead{background:var(--surface);border-bottom:1px solid var(--rule);padding:clamp(2rem,5.5vw,3.2rem) 0 1.6rem;}
+.mast-id{display:flex;flex-wrap:wrap;gap:0.5rem 1.3rem;align-items:baseline;margin-bottom:1.1rem;}
+.ps-num{
+  font-family:var(--f-mono);font-weight:600;font-size:0.78rem;letter-spacing:0.08em;
+  color:var(--accent);background:var(--accent-soft);padding:0.26rem 0.52rem;border-radius:3px;
+}
+.masthead h1{font-size:clamp(1.9rem,5vw,2.9rem);font-weight:700;}
+.mast-sub{font-size:1.08rem;color:var(--ink-2);max-width:58ch;margin-top:0.85rem;}
+.mast-facts{
+  display:flex;flex-wrap:wrap;gap:0 2rem;row-gap:0.85rem;margin-top:1.5rem;
+  padding-top:1.1rem;border-top:1px solid var(--rule-soft);font-family:var(--f-mono);font-size:0.76rem;
+}
+.fact{display:flex;flex-direction:column;gap:0.2rem;}
+.fact b{color:var(--muted);letter-spacing:0.09em;text-transform:uppercase;font-size:0.64rem;font-weight:600;}
+.fact span{color:var(--ink);font-weight:500;}
+
+/* ---------- step rail ---------- */
+.rail-bar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--rule);}
+.rail{display:flex;gap:0;overflow-x:auto;scrollbar-width:thin;}
+.step{
+  display:flex;align-items:baseline;gap:0.5rem;white-space:nowrap;
+  padding:0.8rem 0.95rem;border-bottom:2px solid transparent;
+  font-family:var(--f-ui);font-size:0.83rem;color:var(--muted);
+  transition:color .15s,border-color .15s,background .15s;
+}
+.step .n{font-family:var(--f-mono);font-size:0.68rem;font-weight:600;letter-spacing:0.06em;}
+.step:hover{color:var(--ink);background:var(--surface-2);}
+.step[aria-current="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600;}
+.step[aria-current="true"] .n{color:var(--accent);}
+
+/* ---------- stage ---------- */
+.stage{display:grid;grid-template-columns:1fr;gap:2.2rem;padding:clamp(1.8rem,4vw,3rem) 0 4rem;align-items:start;}
+@media(min-width:960px){.stage{grid-template-columns:minmax(0,392px) minmax(0,1fr);gap:3.2rem;}
+  .device-col{position:sticky;top:4.2rem;}}
+
+/* ---------- device ---------- */
+.device{
+  width:100%;max-width:392px;margin:0 auto;background:var(--shell);
+  border:1px solid var(--shell-rule);border-radius:36px;padding:11px;
+  box-shadow:0 22px 50px -28px rgba(26,23,38,.55);
+}
+.screen{
+  background:var(--screen);border-radius:26px;overflow:hidden;
+  height:722px;display:flex;flex-direction:column;position:relative;
+}
+.statusbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0.5rem 1.05rem 0.35rem;font-family:var(--f-mono);font-size:0.63rem;
+  color:var(--muted);letter-spacing:0.04em;flex:none;
+}
+.statusbar .sb-r{display:flex;gap:0.55rem;}
+.appbar{
+  display:flex;align-items:center;gap:0.6rem;padding:0.35rem 1.05rem 0.7rem;
+  border-bottom:1px solid var(--rule-soft);flex:none;
+}
+.appbar h2{font-size:0.95rem;font-weight:600;flex:1;}
+.chip{
+  font-family:var(--f-mono);font-size:0.6rem;font-weight:600;letter-spacing:0.07em;
+  text-transform:uppercase;padding:0.2rem 0.42rem;border-radius:3px;border:1px solid;
+}
+.chip.off{color:var(--amber);background:var(--amber-soft);border-color:var(--amber);}
+.chip.on{color:var(--teal);background:var(--teal-soft);border-color:var(--teal);}
+.chip.acc{color:var(--accent);background:var(--accent-soft);border-color:var(--accent);}
+.chip.pos{color:var(--crimson);background:var(--crimson-soft);border-color:var(--crimson);}
+.body{flex:1;overflow-y:auto;padding:0.95rem 1.05rem 1.2rem;display:flex;flex-direction:column;gap:0.8rem;font-family:var(--f-ui);}
+.body::-webkit-scrollbar{width:5px;}
+.body::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px;}
+.footer{flex:none;padding:0.75rem 1.05rem 0.95rem;border-top:1px solid var(--rule-soft);background:var(--surface);display:flex;flex-direction:column;gap:0.5rem;}
+
+/* screen primitives */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:0.75rem 0.8rem;display:flex;flex-direction:column;gap:0.55rem;}
+.card.tint{background:var(--surface-2);}
+.lbl{font-family:var(--f-mono);font-size:0.6rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:0.7rem;font-size:0.79rem;}
+.kv .k{color:var(--muted);}
+.kv .v{font-family:var(--f-mono);font-size:0.74rem;font-weight:500;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;}
+.kv .v.tl{color:var(--teal);}
+.kv .v.am{color:var(--amber);}
+.kv .v.cr{color:var(--crimson);}
+.hr{height:1px;background:var(--rule-soft);}
+.btn{
+  display:block;width:100%;text-align:center;padding:0.7rem;border-radius:5px;
+  font-family:var(--f-ui);font-size:0.87rem;font-weight:600;
+  background:var(--accent);color:var(--on-accent);transition:filter .15s;
+}
+.btn:hover{filter:brightness(1.08);}
+.btn[disabled]{background:var(--rule);color:var(--muted);cursor:not-allowed;}
+.btn.ghost{background:none;border:1px solid var(--rule);color:var(--ink-2);font-weight:500;}
+.btn.ghost:hover{background:var(--surface-2);filter:none;}
+.note{font-family:var(--f-ui);font-size:0.68rem;color:var(--muted);text-align:center;line-height:1.4;}
+.mono{font-family:var(--f-mono);font-size:0.7rem;letter-spacing:-0.01em;word-break:break-all;color:var(--ink-2);}
+
+/* viewfinder */
+.view{position:relative;background:var(--view);border-radius:6px;aspect-ratio:3/4;overflow:hidden;flex:none;}
+.view canvas{display:block;width:100%;height:100%;}
+.vf-hint{
+  position:absolute;left:0.6rem;right:0.6rem;bottom:0.6rem;
+  background:rgba(10,8,16,.82);border:1px solid rgba(255,255,255,.14);border-radius:4px;
+  padding:0.45rem 0.55rem;font-family:var(--f-ui);font-size:0.7rem;color:#EDEAF4;line-height:1.35;
+}
+.vf-hint b{color:#E3AA4E;font-weight:600;}
+.meters{display:flex;flex-direction:column;gap:0.4rem;}
+.meter{display:grid;grid-template-columns:5.9rem 1fr 2.7rem;align-items:center;gap:0.5rem;font-size:0.71rem;}
+.meter .mn{color:var(--muted);font-family:var(--f-ui);}
+.track{height:4px;background:var(--rule-soft);border-radius:2px;overflow:hidden;}
+.fill{height:100%;width:0;border-radius:2px;background:var(--teal);transition:width .5s ease, background .3s;}
+.fill.warn{background:var(--amber);}
+.meter .mv{font-family:var(--f-mono);font-size:0.66rem;text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+
+/* result */
+.verdict{border:1px solid;border-radius:6px;padding:0.85rem 0.85rem;display:flex;flex-direction:column;gap:0.4rem;}
+.verdict.pos{border-color:var(--crimson);background:var(--crimson-soft);}
+.verdict.inc{border-color:var(--amber);background:var(--amber-soft);}
+.verdict .vt{font-family:var(--f-ui);font-size:1.12rem;font-weight:700;letter-spacing:-0.02em;line-height:1.15;}
+.verdict.pos .vt{color:var(--crimson);}
+.verdict.inc .vt{color:var(--amber);}
+.verdict .vs{font-family:var(--f-ui);font-size:0.78rem;color:var(--ink-2);}
+.setline{font-family:var(--f-mono);font-size:0.72rem;color:var(--ink);letter-spacing:0.02em;}
+.warnbar{
+  border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:0.55rem 0.65rem;font-family:var(--f-ui);font-size:0.72rem;color:var(--ink-2);line-height:1.45;border-radius:0 4px 4px 0;
+}
+.warnbar b{color:var(--accent);font-weight:600;}
+.seg{display:flex;border:1px solid var(--rule);border-radius:5px;overflow:hidden;}
+.seg button{flex:1;padding:0.42rem;font-family:var(--f-mono);font-size:0.62rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);background:var(--surface);}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);}
+.swatchrow{display:flex;gap:0.35rem;align-items:center;}
+.sw{width:26px;height:26px;border-radius:4px;border:1px solid var(--rule);flex:none;}
+
+/* log rows */
+.row{display:flex;gap:0.6rem;align-items:flex-start;padding:0.6rem 0;border-bottom:1px solid var(--rule-soft);}
+.row:last-child{border-bottom:none;}
+.stripe{width:3px;align-self:stretch;border-radius:2px;flex:none;}
+.stripe.pos{background:var(--crimson);}
+.stripe.neg{background:var(--teal);}
+.stripe.inc{background:var(--amber);}
+.row .rmain{flex:1;display:flex;flex-direction:column;gap:0.16rem;min-width:0;}
+.row .rt{font-family:var(--f-ui);font-size:0.79rem;font-weight:600;}
+.row .rm{font-family:var(--f-mono);font-size:0.63rem;color:var(--muted);}
+.flagline{font-family:var(--f-ui);font-size:0.67rem;color:var(--amber);}
+
+/* certificate */
+.cert{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:0.8rem;font-family:var(--f-mono);font-size:0.66rem;line-height:1.75;color:var(--ink-2);}
+.cert .cf{display:flex;gap:0.45rem;}
+.cert .cf .cl{color:var(--muted);min-width:8.4rem;flex:none;}
+.cert .cf .cv{color:var(--ink);word-break:break-all;}
+.cert .blank{color:var(--amber);}
+.cert h4{font-family:var(--f-ui);font-size:0.78rem;margin-bottom:0.35rem;}
+
+/* verifier */
+.vsec{border-left:3px solid;padding-left:0.6rem;display:flex;flex-direction:column;gap:0.3rem;}
+.vsec.proven{border-color:var(--teal);}
+.vsec.asserted{border-color:var(--amber);}
+.vsec.unver{border-color:var(--muted);}
+.vsec h4{font-family:var(--f-mono);font-size:0.63rem;letter-spacing:0.12em;text-transform:uppercase;}
+.vsec.proven h4{color:var(--teal);}
+.vsec.asserted h4{color:var(--amber);}
+.vsec.unver h4{color:var(--muted);}
+.vsec li{font-family:var(--f-ui);font-size:0.72rem;color:var(--ink-2);line-height:1.45;margin-bottom:0.18rem;}
+.vsec ul{margin:0;padding-left:1rem;}
+
+/* ---------- annotation column ---------- */
+.anno{display:flex;flex-direction:column;gap:1.15rem;max-width:64ch;}
+.anno h3{font-size:clamp(1.3rem,2.6vw,1.75rem);font-weight:600;}
+.anno .kicker{display:flex;align-items:baseline;gap:0.7rem;}
+.anno p{color:var(--ink-2);}
+.anno p + p{margin-top:0.15rem;}
+.anno strong{color:var(--ink);font-weight:600;}
+.anno code{font-family:var(--f-mono);font-size:0.86em;background:var(--surface-2);padding:0.08rem 0.28rem;border-radius:3px;color:var(--ink);}
+.decisions{display:flex;flex-direction:column;gap:0.75rem;background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:1rem 1.05rem;}
+.dec{display:flex;flex-direction:column;gap:0.22rem;}
+.dec .dh{font-family:var(--f-ui);font-size:0.86rem;font-weight:600;color:var(--ink);}
+.dec .db{font-family:var(--f-body);font-size:0.94rem;color:var(--ink-2);line-height:1.5;}
+.binds{border-top:1px solid var(--rule-soft);padding-top:0.85rem;display:flex;flex-direction:column;gap:0.4rem;}
+.binds .bh{font-family:var(--f-mono);font-size:0.63rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.bindlist{display:flex;flex-wrap:wrap;gap:0.35rem;}
+.bindlist span{font-family:var(--f-mono);font-size:0.68rem;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:0.16rem 0.4rem;}
+.nav{display:flex;gap:0.6rem;padding-top:0.4rem;}
+.nav button{
+  font-family:var(--f-ui);font-size:0.82rem;font-weight:500;color:var(--ink-2);
+  border:1px solid var(--rule);border-radius:5px;padding:0.45rem 0.9rem;background:var(--surface);
+}
+.nav button:hover{background:var(--surface-2);color:var(--ink);}
+.nav button[disabled]{opacity:.4;cursor:not-allowed;}
+
+/* ---------- closing sections ---------- */
+section.closing{border-top:1px solid var(--rule);background:var(--surface);padding:clamp(2.2rem,5vw,3.4rem) 0;}
+.grid3{display:grid;grid-template-columns:1fr;gap:1rem;margin-top:1.4rem;}
+@media(min-width:760px){.grid3{grid-template-columns:repeat(3,1fr);}}
+.tile{border:1px solid var(--rule);border-radius:5px;padding:1rem;display:flex;flex-direction:column;gap:0.45rem;background:var(--ground);}
+.tile h4{font-size:0.95rem;font-weight:600;}
+.tile p{font-size:0.94rem;color:var(--ink-2);}
+.tokens{display:flex;flex-wrap:wrap;gap:0.9rem;margin-top:1.3rem;}
+.tok{display:flex;align-items:center;gap:0.5rem;font-family:var(--f-mono);font-size:0.7rem;color:var(--ink-2);}
+.tok i{width:22px;height:22px;border-radius:4px;border:1px solid var(--rule);display:block;}
+footer{padding:2rem 0 3rem;color:var(--muted);font-family:var(--f-mono);font-size:0.7rem;}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
+</style>
+
+<header class="masthead">
+  <div class="wide">
+    <div class="mast-id">
+      <span class="ps-num">SIH26231</span>
+      <span class="eyebrow">Interface design · v0.1 · internal round</span>
+    </div>
+    <h1>Field Companion</h1>
+    <p class="mast-sub">Nine screens for a presumptive drug-test recorder. The classifier is one signed
+      input; the record is the product. Every screen below is designed to be legible to a court that
+      does not trust the person holding the phone.</p>
+    <div class="mast-facts">
+      <div class="fact"><b>Platform</b><span>Flutter · Android-first</span></div>
+      <div class="fact"><b>Target</b><span>Issued handset, gloved hand, daylight</span></div>
+      <div class="fact"><b>Network</b><span>Offline by default</span></div>
+      <div class="fact"><b>Reading level</b><span>Operator, then advocate, then judge</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="rail-bar">
+  <div class="wide">
+    <nav class="rail" id="rail" aria-label="Screens"></nav>
+  </div>
+</div>
+
+<main class="wide stage">
+  <div class="device-col">
+    <div class="device">
+      <div class="screen">
+        <div class="statusbar">
+          <span id="sb-time">14:32</span>
+          <span class="sb-r"><span>NO SIM</span><span>GPS</span><span>78%</span></span>
+        </div>
+        <div class="appbar">
+          <h2 id="sc-title">Ready</h2>
+          <span class="chip off" id="sc-chip">Offline</span>
+        </div>
+        <div class="body" id="sc-body"></div>
+        <div class="footer" id="sc-footer"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="anno">
+    <div class="kicker">
+      <span class="eyebrow" id="an-num">Screen 01</span>
+      <span class="eyebrow" id="an-tag"></span>
+    </div>
+    <h3 id="an-title"></h3>
+    <div id="an-prose" style="display:flex;flex-direction:column;gap:0.7rem;"></div>
+    <div class="decisions" id="an-dec"></div>
+    <div class="nav">
+      <button id="prev" type="button">← Previous</button>
+      <button id="next" type="button">Next →</button>
+    </div>
+  </div>
+</main>
+
+<section class="closing">
+  <div class="wide">
+    <span class="eyebrow">Rules the interface obeys</span>
+    <h3 style="font-size:clamp(1.3rem,3vw,1.9rem);font-weight:600;margin-top:0.6rem;">Four constraints, applied on every screen</h3>
+    <div class="grid3">
+      <div class="tile">
+        <h4>Colour never means good or bad</h4>
+        <p>Crimson marks a presumptive positive, teal a negative, amber an abstention. None of them is a
+          success state. An interface that celebrates a positive is an interface that pressures the
+          operator toward one.</p>
+      </div>
+      <div class="tile">
+        <h4>Nothing is hidden because it is unflattering</h4>
+        <p>A location disagreement, a weak attestation, a wide prediction set — each is shown on the
+          screen where it occurs and written into the record. The defence sees what the prosecution sees.</p>
+      </div>
+      <div class="tile">
+        <h4>The word <em>presumptive</em> is never off-screen</h4>
+        <p>It sits in the result verdict, in the sealed record, on the certificate, and in the export.
+          There is no screen state in which a user can forget what class of claim this is.</p>
+      </div>
+      <div class="tile">
+        <h4>Measured quantities are set in mono</h4>
+        <p>Anything the verifier can recompute — hashes, ΔE, Lab triples, coordinates, α — is typeset in
+          IBM Plex Mono. Prose is Archivo. The typeface tells you whether a number is evidence.</p>
+      </div>
+      <div class="tile">
+        <h4>Blank fields stay blank</h4>
+        <p>The §63 certificate ships with the human signature lines empty and marked in amber. The app
+          computes the hash; it does not sign on anyone's behalf.</p>
+      </div>
+      <div class="tile">
+        <h4>Every gate can be overridden, and the override is recorded</h4>
+        <p>Field conditions are not negotiable with software. The quality gate can be passed under
+          protest — and the protest becomes part of the signed record.</p>
+      </div>
+    </div>
+    <div class="tokens">
+      <span class="tok"><i style="background:#6B3FA0"></i>accent · 6B3FA0</span>
+      <span class="tok"><i style="background:#A32C4A"></i>positive · A32C4A</span>
+      <span class="tok"><i style="background:#0F7B6C"></i>negative · 0F7B6C</span>
+      <span class="tok"><i style="background:#A66A00"></i>abstain · A66A00</span>
+      <span class="tok"><i style="background:#1A1726"></i>ink · 1A1726</span>
+      <span class="tok"><i style="background:#F7F6F9"></i>ground · F7F6F9</span>
+    </div>
+  </div>
+</section>
+
+<footer class="wide">
+  Prototype only. Values shown are illustrative; no real case, operator, or seizure is depicted.
+  Design language inherited from docs/team-brief.html.
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+var DIGEST = "9f3a1d7c48b2e0a5" + "6c91f4d2380be7aa" + "15c0d93e64f7b218" + "aa30cd15e982c210";
+var PREV   = "4e71b0aa93c6d8f2" + "07ba5c31e9d47f60" + "2c8813ab54e0f9dd" + "610a7c34bb02e19f";
+
+function hx(s){ return s.replace(/(.{16})/g,"$1 ").trim(); }
+
+var S = [];
+
+/* ---------------- 01 READY ---------------- */
+S.push({
+  tag:"Standby", bar:"Ready", chip:["off","Offline"],
+  body:
+    '<div class="card">'+
+      '<span class="lbl">Operator</span>'+
+      '<div class="kv"><span class="k">Signed in as</span><span class="v">INSP. R. KULKARNI</span></div>'+
+      '<div class="kv"><span class="k">Credential</span><span class="v">NCB/BLR/2291</span></div>'+
+      '<div class="kv"><span class="k">Unlock</span><span class="v tl">Biometric · 14:29</span></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<span class="lbl">Device posture</span>'+
+      '<div class="kv"><span class="k">Signing key</span><span class="v tl">StrongBox</span></div>'+
+      '<div class="kv"><span class="k">Verified boot</span><span class="v tl">GREEN · locked</span></div>'+
+      '<div class="kv"><span class="k">OS patch level</span><span class="v">2026-08-01</span></div>'+
+      '<div class="kv"><span class="k">Mock location</span><span class="v tl">Off</span></div>'+
+    '</div>'+
+    '<div class="card tint">'+
+      '<span class="lbl">Record chain</span>'+
+      '<div class="kv"><span class="k">Records on device</span><span class="v">47</span></div>'+
+      '<div class="kv"><span class="k">Chain head</span><span class="v">'+PREV.slice(0,8)+'…'+PREV.slice(-4)+'</span></div>'+
+      '<div class="kv"><span class="k">Last anchored</span><span class="v am">3 h 12 m ago</span></div>'+
+      '<div class="kv"><span class="k">Unanchored</span><span class="v am">4 records</span></div>'+
+    '</div>',
+  footer:
+    '<button class="btn" data-go="1" type="button">Begin field test</button>'+
+    '<button class="btn ghost" data-go="6" type="button">Open record log</button>'+
+    '<p class="note">Presumptive testing only. Results are not confirmatory and do not replace laboratory analysis.</p>',
+  an:{
+    title:"The device states its own trustworthiness before it is used",
+    prose:[
+      "Most capture apps open on a camera. This one opens on a <strong>posture report</strong>, because the first question any later challenge will ask is not what the strip looked like — it is what kind of machine was holding the camera.",
+      "StrongBox, verified-boot state and patch level are read at launch and shown plainly. If StrongBox is unavailable the chip reads <code>TEE only</code> in amber, and that weaker guarantee travels into every record made that day rather than being silently absorbed."
+    ],
+    dec:[
+      ["Anchoring debt is on the home screen","Four unanchored records means up to 3 h 12 m of backdating room. That window is the honest limit of what the chain proves, so it is stated where the operator cannot miss it, not buried in a settings pane."],
+      ["Offline is the default chip, not an error","NDPS field work happens without connectivity. Amber here means 'queued', not 'broken' — the interface must never imply the officer has done something wrong by being out of coverage."]
+    ],
+    binds:["operator.id","operator.biometric_unlock_used","device.verified_boot_state","device.os_patch_level","prev_record_hash"]
+  }
+});
+
+/* ---------------- 02 SET UP ---------------- */
+S.push({
+  tag:"Setup", bar:"New test", chip:["acc","Step 1 of 4"],
+  body:
+    '<div class="card">'+
+      '<span class="lbl">Reagent</span>'+
+      '<div class="seg" role="group" aria-label="Reagent">'+
+        '<button type="button" aria-pressed="true">Marquis</button>'+
+        '<button type="button" aria-pressed="false">Mecke</button>'+
+        '<button type="button" aria-pressed="false">Scott</button>'+
+        '<button type="button" aria-pressed="false">Simon</button>'+
+      '</div>'+
+      '<div class="kv"><span class="k">Reference loci loaded</span><span class="v">6 · marquis-v3</span></div>'+
+      '<div class="kv"><span class="k">Kit lot</span><span class="v am">Not legible — photographed</span></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<span class="lbl">Reference card</span>'+
+      '<div class="kv"><span class="k">Card ID</span><span class="v">CARD-IN-2026-0417</span></div>'+
+      '<div class="kv"><span class="k">Print batch</span><span class="v">B12 · matte</span></div>'+
+      '<div class="kv"><span class="k">Patch set</span><span class="v tl">24 verified</span></div>'+
+      '<div class="swatchrow">'+
+        '<span class="sw" style="background:#8E4C7B"></span><span class="sw" style="background:#3F2E52"></span>'+
+        '<span class="sw" style="background:#C9A227"></span><span class="sw" style="background:#2C6E5B"></span>'+
+        '<span class="sw" style="background:#B4B0BC"></span><span class="sw" style="background:#6E6A78"></span>'+
+        '<span class="sw" style="background:#2A2733"></span>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card tint">'+
+      '<span class="lbl">Link to case</span>'+
+      '<div class="kv"><span class="k">FIR</span><span class="v">142/2026 · PS Kadugodi</span></div>'+
+      '<div class="kv"><span class="k">Seizure memo</span><span class="v">SM-2026-0913-07</span></div>'+
+      '<div class="kv"><span class="k">Sample IDs</span><span class="v">S1, S2</span></div>'+
+      '<div class="kv"><span class="k">Witnesses present</span><span class="v">2 · panch recorded</span></div>'+
+    '</div>',
+  footer:
+    '<button class="btn" data-go="2" type="button">Open camera</button>'+
+    '<p class="note">Case linkage may be completed later. An unlinked record is valid but flagged as orphaned.</p>',
+  an:{
+    title:"Kit-agnostic by construction — nothing here depends on a vendor",
+    prose:[
+      "The problem statement requires the system to work alongside kits the department already buys. So the reagent is <strong>declared by the operator</strong>, not read from a proprietary QR code. That single choice is what separates this from the shipping commercial product, and it is made on screen two.",
+      "The reference card carries the identity instead. Its <code>card_id</code> and print batch are bound into the record, so a verifier years later knows exactly which patch reflectances the colour transform was solved against."
+    ],
+    dec:[
+      ["An illegible lot number is a first-class answer","Field kits are wet, creased and expired. Rather than force a fabricated entry, the operator photographs the lot and the app hashes the photo. Missing data is recorded as missing."],
+      ["Case linkage is optional but its absence is visible","Forcing an FIR number before a test that may be happening at 2 a.m. on a roadside guarantees fake numbers. The record instead carries an explicit orphaned flag under NDPS Rules 2022 linkage fields."]
+    ],
+    binds:["kit.reagent_type","kit.kit_photo_hash","card.card_id","card.print_batch","ndps.seizure_memo_ref","ndps.sample_ids"]
+  }
+});
+
+/* ---------------- 03 CAPTURE ---------------- */
+S.push({
+  tag:"Capture", bar:"Frame the card", chip:["acc","Step 2 of 4"],
+  body:
+    '<div class="view"><canvas id="vf" width="600" height="800"></canvas>'+
+      '<div class="vf-hint" id="vfh"><b>Tilt back slightly.</b> Top-right fiducial is clipped and the card plane is 14° off normal.</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<span class="lbl">Live capture quality</span>'+
+      '<div class="meters">'+
+        '<div class="meter"><span class="mn">Fiducial lock</span><span class="track"><span class="fill" data-m="lock"></span></span><span class="mv" data-t="lock">2/4</span></div>'+
+        '<div class="meter"><span class="mn">Illumination</span><span class="track"><span class="fill" data-m="illum"></span></span><span class="mv" data-t="illum">71%</span></div>'+
+        '<div class="meter"><span class="mn">Focus</span><span class="track"><span class="fill" data-m="blur"></span></span><span class="mv" data-t="blur">0.19</span></div>'+
+        '<div class="meter"><span class="mn">Glare</span><span class="track"><span class="fill" data-m="glare"></span></span><span class="mv" data-t="glare">2 spots</span></div>'+
+        '<div class="meter"><span class="mn">Card angle</span><span class="track"><span class="fill" data-m="angle"></span></span><span class="mv" data-t="angle">14°</span></div>'+
+      '</div>'+
+    '</div>',
+  footer:
+    '<button class="btn" id="shutter" type="button" disabled>Hold steady…</button>'+
+    '<p class="note">The card and the reaction well must be in one frame, on one plane, under one light.</p>',
+  onEnter:function(){ startCapture(); },
+  onLeave:function(){ stopCapture(); },
+  an:{
+    title:"The overlay is a measurement instrument, not a decoration",
+    prose:[
+      "The card and the test strip must be photographed together, co-planar and co-illuminated. That is not a framing preference — it is what makes the illumination correction and the device colour transform valid, and it is simultaneously the defence against the oldest attack in the book: photographing a photograph.",
+      "So the guidance overlay is doing real work. Four fiducial targets must lock before the shutter arms; the live meters are the same quantities that will be written into the record as <code>calibration_residual</code>, <code>blur_metric</code> and <code>dynamic_range</code>."
+    ],
+    dec:[
+      ["The shutter is disabled until the frame is measurable","A blocked shutter is a rude interaction, and it is the correct one. A bad frame produces a confident wrong answer in exactly the conditions where a confident wrong answer does the most damage."],
+      ["Hints name the fix, not the failure","'Tilt back slightly' beats 'poor image quality'. The operator is standing in the sun wearing gloves; the copy has one job, which is to tell them what to move."],
+      ["Meters use the operator's vocabulary","'Focus' on screen, blur variance in the record. The same number, named twice, for two different readers."]
+    ],
+    binds:["capture.raw_image_sha256","colorimetry.blur_metric","colorimetry.dynamic_range","card.fiducial_lock"]
+  }
+});
+
+/* ---------------- 04 QUALITY GATE ---------------- */
+S.push({
+  tag:"Gate", bar:"Frame accepted", chip:["acc","Step 3 of 4"],
+  body:
+    '<div class="card">'+
+      '<span class="lbl">Normalisation report</span>'+
+      '<div class="kv"><span class="k">Fiducials resolved</span><span class="v tl">4 / 4 · sub-pixel</span></div>'+
+      '<div class="kv"><span class="k">Homography residual</span><span class="v tl">0.42 px</span></div>'+
+      '<div class="kv"><span class="k">Illumination correction</span><span class="v am">Shadow gradient 12% — removed</span></div>'+
+      '<div class="kv"><span class="k">Colour transform</span><span class="v">root-polynomial · Pixel 7a</span></div>'+
+      '<div class="kv"><span class="k">Residual ΔE on card patches</span><span class="v tl">1.42 (limit 3.00)</span></div>'+
+      '<div class="hr"></div>'+
+      '<div class="kv"><span class="k">Calibration quality</span><span class="v tl">PASS</span></div>'+
+    '</div>'+
+    '<div class="card tint">'+
+      '<span class="lbl">Location bundle</span>'+
+      '<div class="kv"><span class="k">Fix</span><span class="v">12.9912 N, 77.7205 E ±6 m</span></div>'+
+      '<div class="kv"><span class="k">Raw GNSS</span><span class="v tl">14 sv · C/N₀ consistent</span></div>'+
+      '<div class="kv"><span class="k">Wi-Fi neighbourhood</span><span class="v tl">9 BSSID · agrees</span></div>'+
+      '<div class="kv"><span class="k">Serving cell</span><span class="v tl">Agrees</span></div>'+
+      '<div class="kv"><span class="k">Kinematics</span><span class="v tl">Plausible since #47</span></div>'+
+      '<div class="hr"></div>'+
+      '<div class="kv"><span class="k">Corroboration</span><span class="v tl">4 of 4 channels agree</span></div>'+
+    '</div>'+
+    '<div class="warnbar">The shadow across the card was corrected, and <b>the fact that it was there</b> is written into the record. Correction is not concealment.</div>',
+  footer:
+    '<button class="btn" data-go="4" type="button">Read result</button>'+
+    '<button class="btn ghost" data-go="2" type="button">Retake frame</button>',
+  an:{
+    title:"Two gates, reported before any result is shown",
+    prose:[
+      "The colorimetry gate and the location gate both run before the classifier's output is revealed. Order matters: an operator who has already seen 'positive' will rationalise a poor calibration score. An operator who sees the score first reads it honestly.",
+      "The location panel is a bundle, never a single coordinate. Each row constrains the claim independently, and the screen reports <strong>agreement between channels</strong> rather than a fused number that hides which channel dissented."
+    ],
+    dec:[
+      ["Disagreement is displayed, not suppressed","Had the cell ID placed the device in another district, this panel would show the conflict in amber and the record would carry it. A record that quietly drops its contradictions is a record that helps one party only."],
+      ["Every corrective step is disclosed","Shadow removal materially changes the measured colour, so it is named on screen and stored. The verifier re-derives the same correction from the raw frame and must reach the same Lab triple."],
+      ["Retake is offered at equal weight","There is no dark pattern pushing toward proceeding. The second button is a real option, styled as one."]
+    ],
+    binds:["colorimetry.calibration_residual","location_bundle.gnss_raw_digest","location_bundle.wifi_bssid_set_digest","location_bundle.corroboration_score","location_bundle.spoof_indicators[]"]
+  }
+});
+
+/* ---------------- 05 RESULT ---------------- */
+S.push({
+  tag:"Result", bar:"Result", chip:["pos","Presumptive"],
+  body:
+    '<div class="seg" role="group" aria-label="Outcome variant" id="rvar">'+
+      '<button type="button" data-v="pos" aria-pressed="true">Confident case</button>'+
+      '<button type="button" data-v="inc" aria-pressed="false">Abstention case</button>'+
+    '</div>'+
+    '<div id="rslot"></div>',
+  footer:
+    '<button class="btn" data-go="5" type="button">Seal record</button>'+
+    '<p class="note">Sealing is irreversible. The result is written to the chain exactly as shown, including an inconclusive outcome.</p>',
+  onEnter:function(){ renderResult("pos"); },
+  an:{
+    title:"A prediction set, not a percentage",
+    prose:[
+      "The result is reported as the <strong>set of labels the evidence cannot rule out</strong> at the configured risk level. A singleton set is a call. A two-element set is an abstention, and it is displayed with the same visual weight as a call — never as a failure or a retry prompt.",
+      "This is the sentence the design exists to make sayable in court: <em>at α = 0.05, on exchangeable data, the reported label is wrong at most 5% of the time.</em> 'The model was 87% confident' cannot be cross-examined. A conformal bound can."
+    ],
+    dec:[
+      ["Switch the toggle above the phone","The same screen under a degraded frame widens the set to {positive, negative} and reports inconclusive with its reason attached. Both are designed states; neither is an error screen."],
+      ["The distances are shown, not just the verdict","ΔE to the nearest and next-nearest reference locus is the actual basis of the decision. Showing both lets a reader see how close the call was without needing the model."],
+      ["Model identity is on the result screen","<code>model_sha256</code> sits beside the label because a result is meaningless without knowing which model produced it — and the verifier re-runs precisely that one."]
+    ],
+    binds:["classification.prediction_set","classification.label","classification.alpha","classification.model_sha256","colorimetry.lab_values"]
+  }
+});
+
+/* ---------------- 06 SEALED ---------------- */
+S.push({
+  tag:"Seal", bar:"Record sealed", chip:["on","Signed"],
+  body:
+    '<div class="card">'+
+      '<span class="lbl">Field Test Record #48</span>'+
+      '<div class="kv"><span class="k">Encoding</span><span class="v">Canonical CBOR · schema 1.0</span></div>'+
+      '<div class="kv"><span class="k">Algorithm</span><span class="v">SHA-256</span></div>'+
+      '<span class="lbl" style="margin-top:.2rem">Digest</span>'+
+      '<p class="mono">'+hx(DIGEST)+'</p>'+
+    '</div>'+
+    '<div class="card">'+
+      '<span class="lbl">Signature</span>'+
+      '<div class="kv"><span class="k">Key</span><span class="v tl">StrongBox · non-exportable</span></div>'+
+      '<div class="kv"><span class="k">Use authorised by</span><span class="v tl">Fingerprint</span></div>'+
+      '<div class="kv"><span class="k">Attestation</span><span class="v tl">Chain → hardware root</span></div>'+
+      '<div class="kv"><span class="k">Security level</span><span class="v tl">STRONGBOX</span></div>'+
+    '</div>'+
+    '<div class="card tint">'+
+      '<span class="lbl">Position in chain</span>'+
+      '<div class="kv"><span class="k">Previous record</span><span class="v">'+PREV.slice(0,8)+'…'+PREV.slice(-4)+'</span></div>'+
+      '<div class="kv"><span class="k">Anchor status</span><span class="v am">Not yet anchored</span></div>'+
+      '<div class="kv"><span class="k">Open window</span><span class="v am">3 h 14 m</span></div>'+
+    '</div>'+
+    '<div class="warnbar">This record proves it was created <b>no earlier</b> than record #47 and <b>no later</b> than the next anchor. It does not prove the wall-clock time, and it does not claim to.</div>',
+  footer:
+    '<button class="btn" data-go="7" type="button">Generate §63 certificate</button>'+
+    '<button class="btn ghost" data-go="6" type="button">Back to log</button>',
+  an:{
+    title:"The screen that states the limits of its own proof",
+    prose:[
+      "Sealing binds the raw frame hash, the normalised derivative, the colorimetry, the prediction set, the location bundle and the device posture into one canonical CBOR structure, hashes it, and signs it with a key that was generated inside the secure element and can never leave it.",
+      "The attestation chain is what converts <em>an app claims it signed this</em> into <em>this device's secure hardware signed this, and here is a certificate chain to a root you already trust</em> — checkable years later without the handset in evidence."
+    ],
+    dec:[
+      ["The unanchored window is stated as a bound, not hidden","This is the honest weakness of offline operation: a record can only be fabricated within the window since the last anchor. The app prints that window rather than implying certified time it does not have."],
+      ["Sealing is irreversible and the copy says so","No draft state, no edit-after-seal. An interface that permits revision produces records that are worth nothing, because the possibility of revision is all a defence needs."],
+      ["StrongBox versus TEE is surfaced as security level","On handsets without StrongBox this row reads TEE, and the weaker guarantee is inside the signed record — so a verifier grades the evidence correctly instead of assuming the strongest case."]
+    ],
+    binds:["digest","signature","attestation_chain","device.security_level","prev_record_hash","anchor.window"]
+  }
+});
+
+/* ---------------- 07 LOG ---------------- */
+S.push({
+  tag:"Ledger", bar:"Record log", chip:["on","Chain intact"],
+  body:
+    '<div class="card tint">'+
+      '<div class="kv"><span class="k">Chain integrity</span><span class="v tl">48 / 48 verified</span></div>'+
+      '<div class="kv"><span class="k">Gaps or forks</span><span class="v tl">None</span></div>'+
+      '<div class="kv"><span class="k">Awaiting anchor</span><span class="v am">5 records</span></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="row"><span class="stripe pos"></span><div class="rmain">'+
+        '<span class="rt">#48 · Presumptive positive</span>'+
+        '<span class="rm">Marquis · 14:32 · SM-2026-0913-07</span></div></div>'+
+      '<div class="row"><span class="stripe inc"></span><div class="rmain">'+
+        '<span class="rt">#47 · Inconclusive</span>'+
+        '<span class="rm">Mecke · 11:04 · low dynamic range</span></div></div>'+
+      '<div class="row"><span class="stripe neg"></span><div class="rmain">'+
+        '<span class="rt">#46 · Presumptive negative</span>'+
+        '<span class="rm">Scott · 09:51 · SM-2026-0912-03</span></div></div>'+
+      '<div class="row"><span class="stripe pos"></span><div class="rmain">'+
+        '<span class="rt">#45 · Presumptive positive</span>'+
+        '<span class="rm">Marquis · 08:17 · SM-2026-0912-01</span>'+
+        '<span class="flagline">Location disagreement recorded — cell ID conflicts with fix</span></div></div>'+
+      '<div class="row"><span class="stripe neg"></span><div class="rmain">'+
+        '<span class="rt">#44 · Presumptive negative</span>'+
+        '<span class="rm">Marquis · 22:40 · orphaned — no memo linked</span></div></div>'+
+    '</div>',
+  footer:
+    '<button class="btn ghost" data-go="7" type="button">Export selected</button>'+
+    '<p class="note">Records cannot be deleted. A withdrawn test is annotated and remains in the chain.</p>',
+  an:{
+    title:"An append-only ledger that keeps the results nobody wanted",
+    prose:[
+      "Record #45 carries a location disagreement and it is still here, flagged in amber, on the screen the operator uses every day. Record #47 is an inconclusive and sits in the list with equal standing. Record #44 is orphaned because nobody had the memo number at 22:40.",
+      "None of these can be deleted. <code>prev_record_hash</code> makes each entry depend on every entry before it, so removal forks the chain and the fork is visible to any verifier."
+    ],
+    dec:[
+      ["Severity stripes, not icons","Outcome is encoded in a 3px colour stripe at the left edge so the list is scannable at arm's length in sunlight. Colour is doubled by the text label for accessibility; neither is load-bearing alone."],
+      ["'Withdrawn' exists; 'deleted' does not","Operators genuinely need to retract a mistaken test. The interface gives them annotation instead of erasure — the honest primitive for an append-only store."],
+      ["Anchoring debt repeats here","The same amber count from the home screen. Repetition across screens is deliberate for facts that bound what the evidence proves."]
+    ],
+    binds:["record_uuid","prev_record_hash","chain.integrity","anchor.pending_count","location_bundle.spoof_indicators[]"]
+  }
+});
+
+/* ---------------- 08 CERTIFICATE ---------------- */
+S.push({
+  tag:"Statute", bar:"BSA §63 certificate", chip:["acc","Part A"],
+  body:
+    '<div class="cert">'+
+      '<h4>Part A — person in charge of the device</h4>'+
+      '<div class="cf"><span class="cl">Device</span><span class="cv">Google Pixel 7a · IMEI hash 3b91…d4</span></div>'+
+      '<div class="cf"><span class="cl">Operated by</span><span class="cv">INSP. R. KULKARNI · NCB/BLR/2291</span></div>'+
+      '<div class="cf"><span class="cl">Period of use</span><span class="cv">2026-09-13 14:29 – 14:33 IST</span></div>'+
+      '<div class="cf"><span class="cl">Record produced</span><span class="cv">FTR #48 · uuid 018f2c…9a</span></div>'+
+      '<div class="cf"><span class="cl">Hash value</span><span class="cv">'+DIGEST.slice(0,40)+'…</span></div>'+
+      '<div class="cf"><span class="cl">Algorithm</span><span class="cv">SHA-256</span></div>'+
+      '<div class="cf"><span class="cl">Signature</span><span class="cv blank">▢ to be signed by hand</span></div>'+
+      '<div class="hr" style="margin:.5rem 0"></div>'+
+      '<h4>Part B — expert</h4>'+
+      '<div class="cf"><span class="cl">Expert</span><span class="cv blank">▢ not completed</span></div>'+
+      '<div class="cf"><span class="cl">Signature</span><span class="cv blank">▢ not completed</span></div>'+
+    '</div>'+
+    '<div class="card tint">'+
+      '<span class="lbl">eSakshya / CCTNS-2.0 envelope</span>'+
+      '<div class="kv"><span class="k">FIR reference</span><span class="v">142/2026 · PS Kadugodi</span></div>'+
+      '<div class="kv"><span class="k">Locker routing</span><span class="v">By FIR</span></div>'+
+      '<div class="kv"><span class="k">Payload</span><span class="v">FTR + raw frame + certificate</span></div>'+
+      '<div class="kv"><span class="k">Upload</span><span class="v am">Queued — offline</span></div>'+
+    '</div>'+
+    '<div class="warnbar">The app computes the hash and the algorithm name. <b>It does not sign for anyone.</b> Amber fields are for humans and stay empty until a human fills them.</div>',
+  footer:
+    '<button class="btn" data-go="8" type="button">Run independent verifier</button>'+
+    '<button class="btn ghost" type="button">Share bundle</button>',
+  an:{
+    title:"The layer nobody else builds, and it is nearly free",
+    prose:[
+      "Section 63 of the Bharatiya Sakshya Adhiniyam replaced §65B in July 2024, and its certificate must state the <strong>hash value of the record and the algorithm used</strong>. The app has computed exactly that at the moment of capture, so Part A can be pre-populated the instant the record is sealed.",
+      "The envelope beside it treats CCTNS-2.0 as the system of record. There is no parallel evidence store here — building one would create a new surveillance surface and a new liability for no benefit. eSakshya's own offline flow already records locally, generates a hash and uploads later; this is the same trust model, run by the same ministry that owns the problem statement."
+    ],
+    dec:[
+      ["Blank human fields are amber and marked ▢","An auto-filled signature line is a forgery mechanism. The interface makes the boundary between what the machine computed and what a person must attest visible at a glance."],
+      ["Field labels transcribed from the bare Act","Exact Schedule wording and part numbering must be read from the statute before printing this in the submission — a blog is not a source for a document that goes to a court."],
+      ["Upload state is a queue, not a failure","Offline is the expected condition. The envelope is built and held; the record's integrity never depended on the network."]
+    ],
+    binds:["bsa63.part_a","bsa63.hash_value","bsa63.algorithm","esakshya.fir_ref","ndps.seizure_memo_ref"]
+  }
+});
+
+/* ---------------- 09 VERIFIER ---------------- */
+S.push({
+  tag:"Verifier", bar:"Verifier report", chip:["on","No network"],
+  body:
+    '<div class="card tint">'+
+      '<div class="kv"><span class="k">Bundle</span><span class="v">FTR #48</span></div>'+
+      '<div class="kv"><span class="k">Verifier</span><span class="v">ftrverify 0.1 · standalone</span></div>'+
+      '<div class="kv"><span class="k">Trust in capturing app</span><span class="v">None required</span></div>'+
+    '</div>'+
+    '<div class="vsec proven"><h4>Proven</h4><ul>'+
+      '<li>Canonical encoding recomputes to the stated digest.</li>'+
+      '<li>Signature valid; key attested as StrongBox-resident and non-exportable.</li>'+
+      '<li>Attestation chains to the hardware root; verified boot GREEN, bootloader locked.</li>'+
+      '<li>Raw frame hashes to <code>capture.raw_image_sha256</code>; image is unedited.</li>'+
+      '<li>L1–L2 re-run from the raw frame reproduces the stored Lab triple and prediction set bit-for-bit.</li>'+
+      '<li>Chain replays #1 → #48 with no gap and no fork.</li>'+
+    '</ul></div>'+
+    '<div class="vsec asserted"><h4>Asserted, not proven</h4><ul>'+
+      '<li>Wall-clock capture time. Bounded only to 3 h 14 m before the next anchor.</li>'+
+      '<li>That the person who unlocked the key is the named operator. Biometric gating binds the device, not the identity.</li>'+
+      '<li>Reagent type and kit lot — operator-declared, photographed, not machine-read.</li>'+
+    '</ul></div>'+
+    '<div class="vsec unver"><h4>Unverifiable from this bundle</h4><ul>'+
+      '<li>Whether the substance photographed is the substance seized.</li>'+
+      '<li>Whether the reaction had fully developed when the frame was taken.</li>'+
+      '<li>The result itself. This is a presumptive test and confers no confirmatory claim.</li>'+
+    '</ul></div>',
+  footer:
+    '<button class="btn ghost" data-go="0" type="button">Return to standby</button>'+
+    '<p class="note">A verifier that only ever prints VALID ✓ teaches courts to over-trust it.</p>',
+  an:{
+    title:"Three columns, and the last two are the point",
+    prose:[
+      "The verifier is a separate binary with no network and no trust in the app that made the record. It recomputes, re-signs-checks, walks the attestation chain, replays the ledger, and re-runs the whole colour pipeline from the raw frame to confirm the stored classification was not simply written in.",
+      "Then it does the thing that makes it a forensic instrument rather than a rubber stamp: it separates what it proved from what it is merely repeating, and from what no bundle of bytes could ever establish."
+    ],
+    dec:[
+      ["Equal visual weight for all three sections","Proven is teal, asserted is amber, unverifiable is plain grey — none is smaller, none is collapsed behind a disclosure triangle. A reader skimming for the green tick finds the caveats in the same glance."],
+      ["The last line refuses the question everyone wants answered","'Whether the substance photographed is the substance seized' is outside what any camera can establish. Saying so on the report is the difference between a forensic tool and a demo."],
+      ["Two independent implementations","Reference verifier in Python, in-app verifier in Dart. A single implementation agreeing with itself proves nothing."]
+    ],
+    binds:["verifier.proven[]","verifier.asserted[]","verifier.unverifiable[]","chain.replay","classification.reproduced"]
+  }
+});
+
+/* ---------------- result variants ---------------- */
+function renderResult(v){
+  var slot = document.getElementById("rslot");
+  if(!slot) return;
+  var chip = document.getElementById("sc-chip");
+  if(v === "inc"){
+    if(chip){ chip.className = "chip off"; chip.textContent = "Abstained"; }
+    slot.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:.8rem">'+
+      '<div class="verdict inc">'+
+        '<span class="lbl" style="color:var(--amber)">Outcome</span>'+
+        '<span class="vt">Inconclusive</span>'+
+        '<span class="vs">The evidence does not separate the outcomes at the configured risk level.</span>'+
+        '<span class="setline">prediction set = { positive, negative }</span>'+
+      '</div>'+
+      '<div class="card">'+
+        '<span class="lbl">Why the set stayed wide</span>'+
+        '<div class="kv"><span class="k">Dynamic range</span><span class="v am">0.31 · below 0.45</span></div>'+
+        '<div class="kv"><span class="k">ΔE to nearest locus</span><span class="v">9.61 · opiate</span></div>'+
+        '<div class="kv"><span class="k">ΔE to next-nearest</span><span class="v">11.24 · negative</span></div>'+
+        '<div class="kv"><span class="k">Separation</span><span class="v am">1.63 · needs 4.00</span></div>'+
+      '</div>'+
+      '<div class="card tint">'+
+        '<span class="lbl">Measurement</span>'+
+        '<div class="kv"><span class="k">Lab*</span><span class="v">L 44.7 · a 5.2 · b −3.1</span></div>'+
+        '<div class="kv"><span class="k">Risk level α</span><span class="v">0.05 · coverage ≥ 95%</span></div>'+
+        '<div class="kv"><span class="k">Model</span><span class="v">marquis-loci-v3 · 7c41…9e</span></div>'+
+      '</div>'+
+      '<div class="warnbar"><b>Inconclusive is a result.</b> It is signed and written to the chain exactly like any other, with its reason attached. It is not a prompt to try again until the answer improves.</div>'+
+      '</div>';
+  } else {
+    if(chip){ chip.className = "chip pos"; chip.textContent = "Presumptive"; }
+    slot.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:.8rem">'+
+      '<div class="verdict pos">'+
+        '<span class="lbl" style="color:var(--crimson)">Outcome</span>'+
+        '<span class="vt">Presumptive positive</span>'+
+        '<span class="vs">Opiate class · Marquis purple-to-black development.</span>'+
+        '<span class="setline">prediction set = { positive }</span>'+
+      '</div>'+
+      '<div class="card">'+
+        '<span class="lbl">Basis of the call</span>'+
+        '<div class="kv"><span class="k">ΔE to nearest locus</span><span class="v tl">3.81 · opiate</span></div>'+
+        '<div class="kv"><span class="k">ΔE to next-nearest</span><span class="v">14.20 · negative</span></div>'+
+        '<div class="kv"><span class="k">Separation</span><span class="v tl">10.39 · needs 4.00</span></div>'+
+      '</div>'+
+      '<div class="card tint">'+
+        '<span class="lbl">Measurement</span>'+
+        '<div class="swatchrow" style="margin-bottom:.15rem">'+
+          '<span class="sw" style="background:#3A2038"></span>'+
+          '<span class="mono" style="font-size:.66rem">measured patch</span>'+
+        '</div>'+
+        '<div class="kv"><span class="k">Lab*</span><span class="v">L 28.4 · a 12.1 · b −9.6</span></div>'+
+        '<div class="kv"><span class="k">Risk level α</span><span class="v">0.05 · coverage ≥ 95%</span></div>'+
+        '<div class="kv"><span class="k">Model</span><span class="v">marquis-loci-v3 · 7c41…9e</span></div>'+
+      '</div>'+
+      '<div class="warnbar"><b>Presumptive only.</b> This is a screening indication, not confirmation of identity or quantity. Laboratory analysis under NDPS procedure remains required.</div>'+
+      '</div>';
+  }
+}
+
+/* ---------------- viewfinder ---------------- */
+var rafId = null, capStart = 0;
+var REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function lerp(a,b,t){ return a + (b-a)*t; }
+function ease(t){ return t<0 ? 0 : t>1 ? 1 : 1-Math.pow(1-t,3); }
+
+function drawView(p){
+  var c = document.getElementById("vf");
+  if(!c) return;
+  var g = c.getContext("2d");
+  var W = c.width, H = c.height;
+
+  var bg = g.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,"#1B1726"); bg.addColorStop(1,"#0A0810");
+  g.fillStyle = bg; g.fillRect(0,0,W,H);
+
+  /* target guide */
+  g.strokeStyle = "rgba(255,255,255,0.20)";
+  g.setLineDash([10,9]); g.lineWidth = 2;
+  g.strokeRect(70,150,460,380);
+  g.setLineDash([]);
+
+  /* card quad: skewed -> aligned */
+  var q0 = [[128,214],[512,178],[556,520],[104,486]];
+  var q1 = [[80,160],[520,160],[520,530],[80,530]];
+  var q = [];
+  for(var i=0;i<4;i++) q.push([lerp(q0[i][0],q1[i][0],p), lerp(q0[i][1],q1[i][1],p)]);
+
+  g.beginPath(); g.moveTo(q[0][0],q[0][1]);
+  for(var j=1;j<4;j++) g.lineTo(q[j][0],q[j][1]);
+  g.closePath();
+  g.fillStyle = "rgba(238,235,245," + (0.72 + 0.16*p) + ")";
+  g.fill();
+
+  /* shadow gradient across the card, receding as framing improves */
+  var sh = g.createLinearGradient(q[0][0],q[0][1],q[2][0],q[2][1]);
+  sh.addColorStop(0,"rgba(10,8,16," + (0.34*(1-p*0.72)) + ")");
+  sh.addColorStop(1,"rgba(10,8,16,0)");
+  g.fillStyle = sh; g.fill();
+
+  /* colour patch row on the card */
+  var sw = ["#8E4C7B","#3F2E52","#C9A227","#2C6E5B","#B4B0BC","#2A2733"];
+  for(var k=0;k<sw.length;k++){
+    var fx = 0.10 + k*0.135, fy = 0.14;
+    var tx = lerp(lerp(q[0][0],q[1][0],fx), lerp(q[3][0],q[2][0],fx), fy);
+    var ty = lerp(lerp(q[0][1],q[1][1],fx), lerp(q[3][1],q[2][1],fx), fy);
+    g.fillStyle = sw[k];
+    g.fillRect(tx-19, ty-19, 38, 38);
+  }
+
+  /* reaction well */
+  var wx = lerp(lerp(q[0][0],q[1][0],0.5), lerp(q[3][0],q[2][0],0.5), 0.66);
+  var wy = lerp(lerp(q[0][1],q[1][1],0.5), lerp(q[3][1],q[2][1],0.5), 0.66);
+  g.beginPath(); g.arc(wx,wy,52,0,Math.PI*2);
+  g.fillStyle = "#3A2038"; g.fill();
+  g.lineWidth = 3; g.strokeStyle = "rgba(107,63,160,0.85)"; g.stroke();
+  g.beginPath(); g.arc(wx,wy,72,0,Math.PI*2);
+  g.setLineDash([6,7]); g.lineWidth = 2;
+  g.strokeStyle = "rgba(255,255,255,0.42)"; g.stroke(); g.setLineDash([]);
+
+  /* fiducials — lock in order */
+  for(var f=0;f<4;f++){
+    var locked = p > (0.18 + f*0.19);
+    g.lineWidth = 4;
+    g.strokeStyle = locked ? "#5CC5B2" : "#E3AA4E";
+    var s = 30;
+    g.strokeRect(q[f][0]-s/2, q[f][1]-s/2, s, s);
+    g.beginPath(); g.arc(q[f][0],q[f][1],4,0,Math.PI*2);
+    g.fillStyle = g.strokeStyle; g.fill();
+  }
+}
+
+var METERS = {
+  lock:  {from:[50,"2/4"],  to:[100,"4/4"]},
+  illum: {from:[71,"71%"],  to:[96,"96%"]},
+  blur:  {from:[42,"0.19"], to:[94,"0.03"]},
+  glare: {from:[38,"2 spots"], to:[100,"none"]},
+  angle: {from:[45,"14°"],  to:[92,"3°"]}
+};
+
+function setMeters(p){
+  for(var key in METERS){
+    if(!METERS.hasOwnProperty(key)) continue;
+    var m = METERS[key];
+    var bar = document.querySelector('.fill[data-m="'+key+'"]');
+    var txt = document.querySelector('.mv[data-t="'+key+'"]');
+    var val = lerp(m.from[0], m.to[0], p);
+    if(bar){ bar.style.width = val + "%"; bar.className = "fill" + (val < 85 ? " warn" : ""); }
+    if(txt) txt.textContent = p > 0.72 ? m.to[1] : m.from[1];
+  }
+}
+
+function armShutter(){
+  var btn = document.getElementById("shutter");
+  if(!btn) return;
+  btn.disabled = false;
+  btn.textContent = "Capture frame";
+  btn.setAttribute("data-go","3");
+  var h = document.getElementById("vfh");
+  if(h) h.innerHTML = "<b>Locked.</b> Card and reaction well co-planar under one light source. Shutter armed.";
+}
+
+function tick(now){
+  var p = ease((now - capStart) / 2600);
+  drawView(p);
+  setMeters(p);
+  var h = document.getElementById("vfh");
+  if(h && p > 0.45 && p < 0.95) h.innerHTML = "<b>Almost.</b> Two fiducials locked. Hold still while the illumination field is sampled.";
+  if(p < 1){ rafId = requestAnimationFrame(tick); }
+  else { armShutter(); rafId = null; }
+}
+
+function startCapture(){
+  if(REDUCED){ drawView(1); setMeters(1); armShutter(); return; }
+  capStart = performance.now();
+  rafId = requestAnimationFrame(tick);
+}
+function stopCapture(){ if(rafId){ cancelAnimationFrame(rafId); rafId = null; } }
+
+/* ---------------- runtime ---------------- */
+var cur = -1;
+var rail = document.getElementById("rail");
+
+S.forEach(function(sc,i){
+  var b = document.createElement("button");
+  b.type = "button"; b.className = "step";
+  b.innerHTML = '<span class="n">'+("0"+(i+1)).slice(-2)+'</span><span>'+sc.tag+'</span>';
+  b.addEventListener("click", function(){ go(i); });
+  rail.appendChild(b);
+});
+
+function go(i){
+  if(i === cur) return;
+  if(cur >= 0 && S[cur].onLeave) S[cur].onLeave();
+  cur = i;
+  var sc = S[i];
+
+  document.getElementById("sc-title").textContent = sc.bar;
+  var chip = document.getElementById("sc-chip");
+  chip.className = "chip " + sc.chip[0];
+  chip.textContent = sc.chip[1];
+  document.getElementById("sc-body").innerHTML = sc.body;
+  document.getElementById("sc-body").scrollTop = 0;
+  document.getElementById("sc-footer").innerHTML = sc.footer;
+
+  document.getElementById("an-num").textContent = "Screen " + ("0"+(i+1)).slice(-2);
+  document.getElementById("an-tag").textContent = sc.tag;
+  document.getElementById("an-title").textContent = sc.an.title;
+
+  var pr = document.getElementById("an-prose");
+  pr.innerHTML = sc.an.prose.map(function(t){ return "<p>"+t+"</p>"; }).join("");
+
+  var dec = document.getElementById("an-dec");
+  dec.innerHTML =
+    sc.an.dec.map(function(d){
+      return '<div class="dec"><span class="dh">'+d[0]+'</span><span class="db">'+d[1]+'</span></div>';
+    }).join("") +
+    '<div class="binds"><span class="bh">Written into the signed record</span><div class="bindlist">'+
+      sc.an.binds.map(function(b){ return "<span>"+b+"</span>"; }).join("") +
+    '</div></div>';
+
+  Array.prototype.forEach.call(rail.children, function(el,n){
+    el.setAttribute("aria-current", n === i ? "true" : "false");
+  });
+  var active = rail.children[i];
+  if(active && active.scrollIntoView) active.scrollIntoView({block:"nearest", inline:"nearest"});
+
+  document.getElementById("prev").disabled = (i === 0);
+  document.getElementById("next").disabled = (i === S.length - 1);
+
+  if(sc.onEnter) sc.onEnter();
+}
+
+document.addEventListener("click", function(e){
+  var t = e.target.closest ? e.target.closest("[data-go]") : null;
+  if(t){ go(parseInt(t.getAttribute("data-go"),10)); return; }
+  var seg = e.target.closest ? e.target.closest("#rvar button") : null;
+  if(seg){
+    Array.prototype.forEach.call(seg.parentNode.children, function(b){
+      b.setAttribute("aria-pressed", b === seg ? "true" : "false");
+    });
+    renderResult(seg.getAttribute("data-v"));
+    return;
+  }
+  var rg = e.target.closest ? e.target.closest('.seg[role="group"] button') : null;
+  if(rg && !rg.hasAttribute("data-v")){
+    Array.prototype.forEach.call(rg.parentNode.children, function(b){
+      b.setAttribute("aria-pressed", b === rg ? "true" : "false");
+    });
+  }
+});
+
+document.getElementById("prev").addEventListener("click", function(){ if(cur > 0) go(cur-1); });
+document.getElementById("next").addEventListener("click", function(){ if(cur < S.length-1) go(cur+1); });
+document.addEventListener("keydown", function(e){
+  if(e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if(e.key === "ArrowRight" && cur < S.length-1) go(cur+1);
+  if(e.key === "ArrowLeft"  && cur > 0) go(cur-1);
+});
+
+go(0);
+})();
+</script>
