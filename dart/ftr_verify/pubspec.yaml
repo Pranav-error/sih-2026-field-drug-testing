@@ -1,0 +1,15 @@
+name: ftr_verify
+description: Independent Dart verifier for Field Test Records (SIH26231).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  crypto: ^3.0.0          # SHA-256 — deliberately not the same library Python uses
+  pointycastle: ^3.9.1    # ECDSA P-256
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^4.0.0

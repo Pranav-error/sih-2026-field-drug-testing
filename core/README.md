@@ -25,7 +25,8 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 123 tests
+.venv/bin/python -m pytest core                        # 165 tests
+./check.sh                                             # both implementations
 ```
 
 `demo.py` photographs three synthetic strips under three different lighting
@@ -145,11 +146,11 @@ rather than trusting the construction.
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
 | BSA §63 certificate emitter | L6 not started; blocked on transcribing the Schedule from the bare Act. |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
-| Dart implementation | Required — a single implementation agreeing with itself proves nothing. |
+| Dart implementation | **Done** — `dart/ftr_verify`. It does not yet re-run L1/L2 from the raw frame, so it checks integrity but does not reproduce the *result*. |
 
 ## Test suite
 
-123 tests. The ones that matter most:
+165 Python tests, plus 44 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.
@@ -158,6 +159,8 @@ rather than trusting the construction.
   `test_a_location_disagreement_is_recorded_not_suppressed`.
 - `test_colorimetry.py` — CIEDE2000 against the Sharma et al. conformance data,
   and the conformal coverage guarantee measured over 800 trials.
+- `test_cross_implementation.py` — the committed vectors both languages read. If a
+  change to either encoder makes these bytes stop matching, the contract is working.
 - `test_detect.py` — the capture matrix: what the gate accepts must be accurate,
   what would mislead must be rejected, and
   `test_the_printable_card_is_detectable_after_a_camera_round_trip` closes the

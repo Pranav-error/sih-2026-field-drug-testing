@@ -25,13 +25,17 @@ Working documents for Smart India Hackathon 2026.
 ## Code
 
 - [`core/`](core/README.md) — `ftr`, the evidentiary core: canonical CBOR, the Field Test Record,
-  the append-only ledger, the colorimetry pipeline, and the independent verifier. 81 tests.
+  the append-only ledger, the colorimetry pipeline, and the independent verifier. 165 tests.
+- [`dart/ftr_verify/`](dart/ftr_verify/README.md) — the **second** verifier, written independently
+  in Dart with no shared code or dependencies. 44 tests, reading vectors the Python side wrote.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo   # end-to-end, then four attacks
 .venv/bin/python -m pytest core -q                  # 123 tests
 .venv/bin/python -m ftr.printable --out card.png    # print a reference card
+
+./check.sh    # both suites, then asserts the two verifiers reach the same verdict
 ```
 
 ## The one-paragraph version
@@ -49,10 +53,10 @@ No new hardware. A printed colour card and a phone.
 
 | Track | State |
 |---|---|
-| C — crypto / provenance | **Implemented.** `core/ftr`: canonical CBOR, FTR, hash chain, verifier, `ftrverify` CLI. |
+| C — crypto / provenance | **Implemented, twice.** `core/ftr` in Python and `dart/ftr_verify` in Dart, independently written, cross-checked against shared vectors. |
 | A — colour pipeline | **Implemented.** Fiducial detection, homography, illumination correction, patch sampling, quality gate, device transform. Worst error on an accepted frame: 0.76 dE2000 — on synthetic frames only. |
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
-| D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. |
+| D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. The in-app verifier (Dart) exists. |
 | E — legal / statutory | Not started. Blocked on transcribing the BSA §63 Schedule from the bare Act. |
 | F — data | **Not started, and it is the critical path.** The reference card is now printable (`python -m ftr.printable`); no physical card has been photographed yet. |
 

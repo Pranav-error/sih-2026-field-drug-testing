@@ -12,3 +12,7 @@ __pycache__/
 
 # Never commit signing keys, even development ones
 *.pem
+
+# Dart
+dart/**/.dart_tool/
+dart/**/build/

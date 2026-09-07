@@ -1,0 +1,290 @@
+/// The Dart verifier — same three buckets, written independently.
+///
+/// This file exists to disagree with `core/ftr/verifier.py` if either is wrong.
+/// It is not a port: the wording is its own, so that a reader comparing the two
+/// reports is comparing two readings of the record rather than one text echoed
+/// twice. What must match exactly is the *verdict* and the digest — never the prose.
+library;
+
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'canonical_cbor.dart' as cbor;
+import 'record.dart';
+
+class Report {
+  final proven = <String>[];
+  final asserted = <String>[];
+  final unverifiable = <String>[];
+  final failures = <String>[];
+
+  bool get ok => failures.isEmpty;
+
+  String text() {
+    final b = StringBuffer();
+    void block(String title, List<String> items, String mark) {
+      if (items.isEmpty) return;
+      b.writeln(title);
+      b.writeln('-' * title.length);
+      for (final it in items) {
+        for (final (i, line) in _wrap(it, 74).indexed) {
+          b.writeln(' ${i == 0 ? mark : ' '}  $line');
+        }
+      }
+      b.writeln();
+    }
+
+    block('FAILED', failures, 'x');
+    block('PROVEN', proven, '+');
+    block('ASSERTED, NOT PROVEN', asserted, '~');
+    block('UNVERIFIABLE FROM THIS BUNDLE', unverifiable, '.');
+    b.writeln('${ok ? 'VERIFIED' : 'VERIFICATION FAILED'} — ${proven.length} proven, '
+        '${asserted.length} asserted, ${unverifiable.length} unverifiable');
+    if (ok) {
+      b.writeln('A verified record is not a true result. It is an unaltered one.');
+    }
+    return b.toString();
+  }
+}
+
+List<String> _wrap(String s, int w) {
+  final out = <String>[];
+  var line = '';
+  for (final word in s.split(RegExp(r'\s+'))) {
+    if (line.isNotEmpty && line.length + 1 + word.length > w) {
+      out.add(line);
+      line = word;
+    } else {
+      line = line.isEmpty ? word : '$line $word';
+    }
+  }
+  if (line.isNotEmpty) out.add(line);
+  return out.isEmpty ? [''] : out;
+}
+
+Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
+  final r = Report();
+
+  late SealedRecord rec;
+  try {
+    rec = SealedRecord.fromEnvelope(blob);
+  } catch (e) {
+    r.failures.add('Envelope will not decode: $e');
+    return r;
+  }
+
+  if (cbor.isCanonical(rec.bodyCbor)) {
+    r.proven.add('The record body is canonically encoded: it decodes and re-encodes '
+        'to the same bytes, so any implementation reaches the same digest.');
+  } else {
+    r.failures.add('The record body is not canonical CBOR. Its digest is not '
+        'reproducible, so no signature over it means anything.');
+    return r;
+  }
+
+  final body = rec.body;
+  r.proven.add('SHA-256 of the body recomputes to ${hex(rec.digest)}.');
+
+  if (rec.signatureValid) {
+    r.proven.add('The signature verifies against the recomputed digest under the '
+        'public key carried in the envelope.');
+  } else {
+    r.failures.add('The signature does not verify over the recomputed digest. The '
+        'record has been altered since it was sealed, or it was never sealed by this key.');
+  }
+
+  final att = rec.attestation;
+  final level = att['security_level'] as String? ?? 'UNKNOWN';
+  switch (level) {
+    case 'STRONGBOX':
+      r.proven.add('Key attestation states the signing key was generated in '
+          'StrongBox, a discrete secure element, and is non-exportable.');
+    case 'TEE':
+      r.proven.add('Key attestation states the signing key was generated in the TEE '
+          'and is non-exportable. Weaker than StrongBox: no discrete secure element.');
+    default:
+      r.failures.add('Signing key security level is $level. The key is not '
+          'hardware-backed, so the signature proves only that whoever held the key '
+          'file made this record. It says nothing about which device produced it. '
+          'Development records must never be presented as evidence.');
+  }
+
+  if (att['key_exportable'] == true) {
+    r.asserted.add('The key is marked exportable, so a copy may exist elsewhere. '
+        'Authorship is not established by this signature alone.');
+  }
+
+  final vbs = att['verified_boot_state'] as String? ?? 'UNKNOWN';
+  final locked = att['bootloader_locked'] == true;
+  if (vbs == 'GREEN' && locked) {
+    r.proven.add('Verified boot was GREEN and the bootloader locked when the key was '
+        'attested: the device was running unmodified signed firmware.');
+  } else if (vbs == 'UNKNOWN') {
+    r.asserted.add('Verified boot state is unknown; device integrity is not established.');
+  } else {
+    r.failures.add('Verified boot state is $vbs and the bootloader is '
+        '${locked ? 'locked' : 'unlocked'}. The record was produced on a modified device.');
+  }
+
+  if ((att['cert_chain_len'] as int? ?? 0) == 0) {
+    r.asserted.add('No attestation certificate chain is present, so the hardware '
+        'claims above cannot be traced to a root certificate authority.');
+  }
+
+  final capture = body['capture'];
+  if (capture is Map) {
+    capture.forEach((k, want) {
+      if (k is! String || !k.endsWith('_sha256') || want is! Uint8List) return;
+      final name = k.substring(0, k.length - '_sha256'.length);
+      final supplied = images?[k];
+      if (supplied == null) {
+        r.asserted.add('$k is recorded as ${hex(want).substring(0, 16)}… but the file '
+            'was not supplied to this verifier, so the image behind it was not checked.');
+      } else if (bytesEqual(sha256(supplied), want)) {
+        r.proven.add('The supplied $name hashes to the value in the record: the image '
+            'is byte-identical to the one sealed at capture.');
+      } else {
+        r.failures.add('The supplied $name does NOT match the hash in the record. '
+            'The image has been altered since capture.');
+      }
+    });
+  }
+
+  final ts = body['captured_at'];
+  if (ts is Map && ts['device_clock'] != null) {
+    r.asserted.add('Capture time is stated as ${ts['device_clock']}, taken from the '
+        'device clock. Nothing here proves the clock was correct; only the chain and '
+        'an anchor bound when this record was made.');
+  }
+  final op = body['operator'];
+  if (op is Map && op['biometric_unlock_used'] == true) {
+    r.asserted.add('Key use was gated by a biometric. That binds the record to the '
+        'enrolled device, not to the named person.');
+  }
+  final kit = body['kit'];
+  if (kit is Map && kit['reagent_type'] != null) {
+    r.asserted.add('Reagent is declared as ${kit['reagent_type']} by the operator. It '
+        'is not machine-read, by design — the system is kit-agnostic.');
+  }
+  for (final name in (body['omitted'] as List? ?? const [])) {
+    r.asserted.add("Field '$name' was recorded as unavailable at capture.");
+  }
+
+  final loc = body['location_bundle'];
+  if (loc is Map) {
+    final agree = loc['corroboration_channels_agreeing'] as int?;
+    final total = loc['corroboration_channels_total'] as int?;
+    if (agree != null && total != null && total > 0) {
+      if (agree == total) {
+        r.proven.add('All $total independent location channels agreed at capture '
+            '(GNSS geometry, Wi-Fi neighbourhood, serving cell, kinematics).');
+      } else {
+        r.asserted.add('Only $agree of $total location channels agreed. The '
+            'disagreement is recorded below and is available to either party.');
+      }
+    }
+    for (final ind in (loc['spoof_indicators'] as List? ?? const [])) {
+      r.asserted.add('Location anomaly recorded at capture: $ind');
+    }
+  }
+
+  final cls = body['classification'];
+  final alpha = (cls is Map ? cls['alpha_x1000'] : null) ?? '?';
+  r.unverifiable.addAll([
+    'Whether the substance photographed is the substance seized. No bundle of bytes '
+        'can establish this; it rests on the seizure procedure and the witnesses.',
+    'Whether the colorimetric reaction had fully developed when the frame was taken.',
+    'The correctness of the result itself. This is a presumptive screening test '
+        'reported at risk level alpha=$alpha/1000; it is not confirmatory and does '
+        'not identify a substance.',
+  ]);
+  return r;
+}
+
+Report verifyChain(Directory root) {
+  final r = Report();
+  final files = root
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.ftr'))
+      .toList()
+    ..sort((a, b) => a.path.compareTo(b.path));
+
+  if (files.isEmpty) {
+    r.failures.add('No records found in ${root.path}.');
+    return r;
+  }
+
+  var bad = 0;
+  final records = <SealedRecord>[];
+  for (final f in files) {
+    final sub = verifyRecord(f.readAsBytesSync());
+    if (!sub.ok) {
+      bad++;
+      for (final x in sub.failures) {
+        r.failures.add('record ${_stem(f.path)}: $x');
+      }
+    }
+    try {
+      records.add(SealedRecord.fromEnvelope(f.readAsBytesSync()));
+    } catch (_) {}
+  }
+  if (bad == 0) {
+    r.proven.add('All ${files.length} records individually verify: canonical, hashed '
+        'and signed.');
+  }
+
+  var prev = genesisHash;
+  var genesisSeen = 0;
+  final breaks = <String>[];
+  for (var i = 0; i < records.length; i++) {
+    final rec = records[i];
+    if (rec.sequence != i) {
+      breaks.add('chain break at #$i [bad_sequence]: file carries sequence ${rec.sequence}');
+    }
+    if (bytesEqual(rec.prevRecordHash, genesisHash)) {
+      genesisSeen++;
+      if (genesisSeen > 1) {
+        breaks.add('chain break at #${rec.sequence} [duplicate_genesis]: a second '
+            'record claims to be first on this device');
+      }
+    }
+    if (!bytesEqual(rec.prevRecordHash, prev)) {
+      breaks.add('chain break at #${rec.sequence} [${i > 0 ? 'gap' : 'fork'}]: chains to '
+          '${hex(rec.prevRecordHash).substring(0, 16)}…, expected ${hex(prev).substring(0, 16)}…');
+    }
+    prev = rec.digest;
+  }
+
+  if (breaks.isEmpty) {
+    r.proven.add('The chain replays from genesis to record #${records.length - 1} with '
+        'no gap and no fork: no record was reordered, removed from the middle, or '
+        'inserted after the fact.');
+  } else {
+    r.failures.addAll(breaks);
+  }
+
+  final anchorFile = File('${root.path}/ANCHOR');
+  final anchor = anchorFile.existsSync() ? int.tryParse(anchorFile.readAsStringSync().trim()) : null;
+  if (anchor == null) {
+    r.asserted.add('This chain has never been anchored. All ${records.length} records '
+        'could have been produced at any time; the ledger fixes their order, not their date.');
+  } else {
+    final unanchored = records.length - (anchor + 1);
+    if (unanchored > 0) {
+      r.asserted.add('$unanchored record(s) after #$anchor are unanchored. Each proves '
+          'only that it was made after the record before it and before the next anchor.');
+    } else {
+      r.proven.add('Every record is anchored up to #$anchor.');
+    }
+  }
+
+  r.unverifiable.add('Whether records were removed from the *head* of the chain. '
+      'Truncation is detectable only against an external anchor, never from the files alone.');
+  return r;
+}
+
+String _stem(String path) {
+  final base = path.split(Platform.pathSeparator).last;
+  return base.endsWith('.ftr') ? base.substring(0, base.length - 4) : base;
+}
