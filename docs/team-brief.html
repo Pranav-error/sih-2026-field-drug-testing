@@ -1,0 +1,608 @@
+<title>Field Test Record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+:root{
+  --ground:#F7F6F9;
+  --surface:#FFFFFF;
+  --surface-2:#F0EEF4;
+  --ink:#1A1726;
+  --ink-2:#413A55;
+  --muted:#6A6478;
+  --rule:#DEDAE7;
+  --rule-soft:#EAE7F0;
+  --accent:#6B3FA0;
+  --accent-soft:#EDE6F6;
+  --amber:#A66A00;
+  --amber-soft:#F8EEDC;
+  --teal:#0F7B6C;
+  --teal-soft:#DFF0EC;
+  --crimson:#A32C4A;
+  --crimson-soft:#F8E4E9;
+
+  --f-display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --f-body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --f-mono:'IBM Plex Mono','SF Mono',Menlo,monospace;
+
+  --measure:68ch;
+  --pad:clamp(1.1rem,4vw,2rem);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#141220;
+    --surface:#1C1928;
+    --surface-2:#242032;
+    --ink:#ECEAF2;
+    --ink-2:#C4BED4;
+    --muted:#948CA8;
+    --rule:#312C42;
+    --rule-soft:#272338;
+    --accent:#B392E4;
+    --accent-soft:#2A2140;
+    --amber:#E3AA4E;
+    --amber-soft:#332813;
+    --teal:#5CC5B2;
+    --teal-soft:#12302C;
+    --crimson:#E8879E;
+    --crimson-soft:#361A24;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141220;
+  --surface:#1C1928;
+  --surface-2:#242032;
+  --ink:#ECEAF2;
+  --ink-2:#C4BED4;
+  --muted:#948CA8;
+  --rule:#312C42;
+  --rule-soft:#272338;
+  --accent:#B392E4;
+  --accent-soft:#2A2140;
+  --amber:#E3AA4E;
+  --amber-soft:#332813;
+  --teal:#5CC5B2;
+  --teal-soft:#12302C;
+  --crimson:#E8879E;
+  --crimson-soft:#361A24;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:1.0625rem;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--measure);margin:0 auto;padding:0 var(--pad);}
+.wide{max-width:min(1120px,94vw);margin:0 auto;padding:0 var(--pad);}
+
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15;letter-spacing:-0.015em;}
+p{margin:0;}
+a{color:var(--accent);}
+
+.eyebrow{
+  font-family:var(--f-mono);font-size:0.70rem;font-weight:600;
+  letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);
+}
+
+/* ---------- masthead ---------- */
+.masthead{
+  border-bottom:1px solid var(--rule);
+  background:var(--surface);
+  padding:clamp(2.4rem,7vw,4rem) 0 clamp(1.8rem,4vw,2.4rem);
+}
+.mast-inner{display:flex;flex-direction:column;gap:1.5rem;}
+.mast-id{display:flex;flex-wrap:wrap;gap:0.5rem 1.4rem;align-items:baseline;}
+.ps-num{
+  font-family:var(--f-mono);font-weight:600;font-size:0.8rem;letter-spacing:0.08em;
+  color:var(--accent);background:var(--accent-soft);
+  padding:0.28rem 0.55rem;border-radius:3px;
+}
+h1{font-size:clamp(2.1rem,6.2vw,3.4rem);font-weight:700;}
+.mast-sub{font-size:1.15rem;color:var(--ink-2);max-width:54ch;}
+.mast-facts{
+  display:flex;flex-wrap:wrap;gap:0 2.2rem;row-gap:0.9rem;
+  padding-top:1.2rem;border-top:1px solid var(--rule-soft);
+  font-family:var(--f-mono);font-size:0.78rem;
+}
+.fact{display:flex;flex-direction:column;gap:0.22rem;}
+.fact span:first-child{color:var(--muted);letter-spacing:0.09em;text-transform:uppercase;font-size:0.66rem;}
+.fact span:last-child{color:var(--ink);font-weight:500;}
+
+/* ---------- sections ---------- */
+section{padding:clamp(2.6rem,6vw,4.2rem) 0;}
+section + section{border-top:1px solid var(--rule-soft);}
+.s-head{display:flex;flex-direction:column;gap:0.7rem;margin-bottom:1.7rem;}
+h2{font-size:clamp(1.45rem,3.6vw,2.05rem);font-weight:600;}
+h3{font-size:1.08rem;font-weight:600;letter-spacing:-0.005em;}
+.lede{font-size:1.1rem;color:var(--ink-2);}
+.stack{display:flex;flex-direction:column;gap:1.05rem;}
+.stack-tight{display:flex;flex-direction:column;gap:0.65rem;}
+
+/* ---------- the split ---------- */
+.split{display:grid;gap:1rem;grid-template-columns:1fr;margin:0.4rem 0 0;}
+@media(min-width:640px){.split{grid-template-columns:1fr 1fr;}}
+.coat{
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  padding:1.3rem 1.35rem;display:flex;flex-direction:column;gap:0.6rem;
+}
+.coat.hard{border-color:var(--accent);}
+.coat .eyebrow{color:var(--muted);}
+.coat.hard .eyebrow{color:var(--accent);}
+.coat p{font-size:0.98rem;color:var(--ink-2);}
+.coat strong{color:var(--ink);font-weight:600;}
+.verdict{
+  font-family:var(--f-mono);font-size:0.73rem;font-weight:500;
+  color:var(--muted);border-top:1px dashed var(--rule);padding-top:0.6rem;margin-top:auto;
+}
+
+blockquote{
+  margin:0;padding:1.15rem 0 1.15rem 1.35rem;
+  border-left:3px solid var(--accent);
+  font-size:1.16rem;line-height:1.5;color:var(--ink);
+}
+blockquote em{color:var(--accent);font-style:italic;}
+blockquote .attrib{
+  display:block;margin-top:0.6rem;font-family:var(--f-mono);
+  font-size:0.72rem;color:var(--muted);letter-spacing:0.05em;
+}
+
+/* ---------- prior art ---------- */
+.prior{display:grid;gap:1rem;grid-template-columns:1fr;}
+@media(min-width:720px){.prior{grid-template-columns:1fr 1fr;}}
+.pcard{
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.pcard header{
+  padding:0.95rem 1.2rem;border-bottom:1px solid var(--rule-soft);
+  display:flex;flex-direction:column;gap:0.28rem;background:var(--surface-2);
+}
+.pcard header h3{font-size:1.02rem;}
+.pcard header .eyebrow{font-size:0.64rem;}
+.pcard .pbody{padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.75rem;font-size:0.96rem;color:var(--ink-2);}
+.pcard .gap{
+  margin-top:auto;padding:0.85rem 1.2rem;background:var(--accent-soft);
+  font-family:var(--f-mono);font-size:0.76rem;line-height:1.5;color:var(--ink);
+  border-top:1px solid var(--rule-soft);
+}
+.pcard .gap b{color:var(--accent);font-weight:600;}
+
+/* ---------- layer stack ---------- */
+.layers{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--surface);}
+.lgroup{
+  display:flex;align-items:center;gap:0.7rem;
+  padding:0.6rem 1.1rem;background:var(--surface-2);
+  border-bottom:1px solid var(--rule-soft);
+}
+.lgroup .eyebrow{font-size:0.65rem;color:var(--accent);}
+.lgroup .q{font-family:var(--f-mono);font-size:0.74rem;color:var(--muted);}
+.layer{
+  display:grid;grid-template-columns:auto 1fr;gap:0.5rem 1rem;
+  padding:1rem 1.1rem;border-bottom:1px solid var(--rule-soft);
+}
+@media(min-width:760px){.layer{grid-template-columns:3.2rem 15rem 1fr;align-items:baseline;}}
+.layer:last-child{border-bottom:none;}
+.lnum{
+  font-family:var(--f-mono);font-weight:600;font-size:0.8rem;color:var(--accent);
+  letter-spacing:0.04em;
+}
+.lname{font-family:var(--f-display);font-weight:600;font-size:0.97rem;color:var(--ink);}
+.ldesc{font-size:0.94rem;color:var(--ink-2);grid-column:1/-1;}
+@media(min-width:760px){.ldesc{grid-column:3;}}
+.ldesc code{font-family:var(--f-mono);font-size:0.85em;background:var(--surface-2);padding:0.08em 0.34em;border-radius:3px;color:var(--ink);}
+
+/* ---------- outcome chips ---------- */
+.chips{display:grid;gap:0.85rem;grid-template-columns:1fr;}
+@media(min-width:640px){.chips{grid-template-columns:repeat(3,1fr);}}
+.chip{
+  border:1px solid var(--rule);border-radius:4px;padding:1.05rem 1.1rem;
+  background:var(--surface);display:flex;flex-direction:column;gap:0.5rem;
+}
+.chip .dot{width:0.62rem;height:0.62rem;border-radius:50%;}
+.chip .label{display:flex;align-items:center;gap:0.5rem;font-family:var(--f-mono);font-size:0.8rem;font-weight:600;letter-spacing:0.04em;}
+.chip p{font-size:0.9rem;color:var(--ink-2);}
+.chip.pos{border-color:var(--teal);background:var(--teal-soft);}
+.chip.pos .dot{background:var(--teal);} .chip.pos .label{color:var(--teal);}
+.chip.neg .dot{background:var(--muted);} .chip.neg .label{color:var(--muted);}
+.chip.inc{border-color:var(--amber);background:var(--amber-soft);}
+.chip.inc .dot{background:var(--amber);} .chip.inc .label{color:var(--amber);}
+
+/* ---------- tables ---------- */
+.scroller{overflow-x:auto;border:1px solid var(--rule);border-radius:4px;background:var(--surface);}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:0.9rem;}
+thead th{
+  font-family:var(--f-mono);font-size:0.68rem;font-weight:600;letter-spacing:0.1em;
+  text-transform:uppercase;color:var(--muted);text-align:left;
+  padding:0.75rem 0.9rem;background:var(--surface-2);border-bottom:1px solid var(--rule);
+  white-space:nowrap;
+}
+tbody td{padding:0.72rem 0.9rem;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--ink-2);}
+tbody tr:last-child td{border-bottom:none;}
+td.n{font-family:var(--f-mono);font-size:0.8rem;color:var(--accent);font-variant-numeric:tabular-nums;width:2.6rem;}
+td.move{color:var(--ink);font-weight:600;font-family:var(--f-display);font-size:0.9rem;}
+.resid{font-family:var(--f-mono);font-size:0.78rem;}
+tr.owned td{background:var(--accent-soft);}
+td.track{font-family:var(--f-mono);font-size:0.82rem;font-weight:600;color:var(--accent);white-space:nowrap;}
+td.who{font-family:var(--f-display);font-weight:600;font-size:0.88rem;color:var(--ink);white-space:nowrap;}
+.crit{
+  display:inline-block;font-family:var(--f-mono);font-size:0.62rem;font-weight:600;
+  letter-spacing:0.09em;text-transform:uppercase;color:var(--crimson);
+  background:var(--crimson-soft);padding:0.14rem 0.4rem;border-radius:3px;margin-left:0.45rem;
+}
+
+/* ---------- not-claiming list ---------- */
+.nots{display:grid;gap:0.55rem 1.6rem;grid-template-columns:1fr;list-style:none;padding:0;margin:0;}
+@media(min-width:640px){.nots{grid-template-columns:1fr 1fr;}}
+.nots li{
+  display:flex;gap:0.6rem;align-items:baseline;font-size:0.95rem;color:var(--muted);
+  padding-bottom:0.55rem;border-bottom:1px solid var(--rule-soft);
+}
+.nots li::before{content:"✗";font-family:var(--f-mono);color:var(--crimson);font-size:0.85rem;flex:none;}
+
+/* ---------- finale sequence ---------- */
+.seq{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;counter-reset:step;}
+.seq li{
+  display:grid;grid-template-columns:auto 1fr;gap:0 1.1rem;
+  padding:1rem 0;border-bottom:1px solid var(--rule-soft);counter-increment:step;
+}
+.seq li:last-child{border-bottom:none;}
+.seq li::before{
+  content:counter(step);
+  font-family:var(--f-mono);font-size:0.75rem;font-weight:600;color:var(--accent);
+  border:1px solid var(--accent);border-radius:50%;
+  width:1.7rem;height:1.7rem;display:flex;align-items:center;justify-content:center;
+  flex:none;align-self:start;
+}
+.seq h3{margin-bottom:0.25rem;}
+.seq p{font-size:0.94rem;color:var(--ink-2);}
+.seq li.moment::before{background:var(--accent);color:var(--surface);}
+.seq li.moment h3{color:var(--accent);}
+
+/* ---------- open questions ---------- */
+.oq{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.75rem;}
+.oq li{
+  display:flex;gap:0.75rem;font-size:0.95rem;color:var(--ink-2);
+  background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--amber);
+  border-radius:3px;padding:0.8rem 1rem;
+}
+.oq .who2{font-family:var(--f-mono);font-size:0.7rem;color:var(--amber);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;flex:none;padding-top:0.16rem;width:4.6rem;}
+
+/* ---------- closer ---------- */
+.closer{
+  background:var(--surface);border-top:1px solid var(--rule);
+  padding:clamp(3rem,8vw,5rem) 0;
+}
+.closer .line{
+  font-family:var(--f-display);font-weight:600;font-size:clamp(1.4rem,4.4vw,2.15rem);
+  line-height:1.24;text-wrap:balance;color:var(--ink);
+}
+.closer .line em{color:var(--accent);font-style:normal;}
+.closer .foot{
+  margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--rule-soft);
+  font-family:var(--f-mono);font-size:0.75rem;color:var(--muted);line-height:1.7;
+}
+</style>
+
+<header class="masthead">
+  <div class="wrap mast-inner">
+    <div class="mast-id">
+      <span class="ps-num">SIH26231</span>
+      <span class="eyebrow">Team brief · read before week 1</span>
+    </div>
+    <h1>The record is the product.</h1>
+    <p class="mast-sub">Why we are not building a colour classifier, and what each of us owns for the next three weeks.</p>
+    <div class="mast-facts">
+      <div class="fact"><span>Problem owner</span><span>MHA / Narcotics Control Bureau</span></div>
+      <div class="fact"><span>Category</span><span>Software · MedTech</span></div>
+      <div class="fact"><span>Deadline</span><span>30 September 2026</span></div>
+      <div class="fact"><span>Team</span><span>6 · ~3 weeks to internal round</span></div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap stack">
+    <div class="s-head">
+      <span class="eyebrow">01 · The problem</span>
+      <h2>Two problems wearing one coat</h2>
+      <p class="lede">The PS asks for an app that photographs a colorimetric drug-test strip, classifies the colour, and produces a tamper-evident record. Those are not one problem, and they are nowhere near equally hard.</p>
+    </div>
+
+    <div class="split">
+      <div class="coat">
+        <span class="eyebrow">What it appears to ask</span>
+        <p><strong>Classify a colour change.</strong> Point a camera at a reagent strip, decide which colour it turned.</p>
+        <p class="verdict">Undergraduate computer-vision exercise. Solved.</p>
+      </div>
+      <div class="coat hard">
+        <span class="eyebrow">What NCB actually has</span>
+        <p><strong>A field test result is not usable as evidence.</strong> Nothing proves the test happened, at that place, at that time, by that officer.</p>
+        <p class="verdict">Unsolved. This is the specification.</p>
+      </div>
+    </div>
+
+    <p>The problem statement says it in its own words — field testing “leaves no verifiable record that a test was actually conducted at a given place and time. As a result, field test outcomes cannot presently be relied upon as documentary evidence.”</p>
+
+    <blockquote>
+      The classifier is not the product. The <em>record</em> is the product — and the classifier is one signed input to it that must be able to say “I don’t know.”
+      <span class="attrib">Design axiom · everything below follows from this</span>
+    </blockquote>
+  </div>
+</section>
+
+<section>
+  <div class="wide stack">
+    <div class="s-head">
+      <span class="eyebrow">02 · Prior art</span>
+      <h2>The obvious build already ships</h2>
+      <p class="lede">Before anyone gets attached to an idea: the naive version of this PS is a commercial product sold to police, and the ministry that owns the PS already runs the evidence vault. Knowing this is our advantage — it tells us exactly where the remaining gap is.</p>
+    </div>
+
+    <div class="prior">
+      <article class="pcard">
+        <header>
+          <span class="eyebrow">Commercial · deployed</span>
+          <h3>DetectaChem MobileDetect</h3>
+        </header>
+        <div class="pbody">
+          <p>Phone app plus colorimetric pouches. Scan a QR on the pouch, automated colour reading in seconds, report with GPS mapping, images, date and time, PDF export — marketed explicitly as aiding “chain-of-evidence.”</p>
+          <p>If we pitch “our app photographs a strip and logs GPS,” we get dismantled in ninety seconds.</p>
+        </div>
+        <p class="gap"><b>The gap:</b> it is tied to their own serialised pouches. <b>SIH26231 requires kit-agnostic operation with no new hardware.</b> That constraint is not incidental — it is the opening.</p>
+      </article>
+
+      <article class="pcard">
+        <header>
+          <span class="eyebrow">Government of India · NCRB</span>
+          <h3>eSakshya</h3>
+        </header>
+        <div class="pbody">
+          <p>MHA’s own app for BNSS-mandated search-and-seizure recording. Uploads into encrypted “Sakshya Locker” vaults on the National Government Cloud, integrated into CCTNS-2.0. When offline, the officer records locally, <em>generates a hash</em>, and uploads later.</p>
+          <p>Same trust model we were going to propose. Same ministry that owns our PS.</p>
+        </div>
+        <p class="gap"><b>Therefore:</b> do <b>not</b> pitch a blockchain evidence store. Build a presumptive-test module that emits records eSakshya already knows how to swallow. CCTNS-2.0 is the system of record, not us.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wide stack">
+    <div class="s-head">
+      <span class="eyebrow">03 · Architecture</span>
+      <h2>Seven layers, four questions</h2>
+      <p class="lede">Read the right-hand column as the answer each group of layers gives a court. Only the first two have anything to do with chemistry.</p>
+    </div>
+
+    <div class="layers">
+      <div class="lgroup"><span class="eyebrow">Group A</span><span class="q">→ what did the test say?</span></div>
+
+      <div class="layer">
+        <span class="lnum">L1</span>
+        <span class="lname">Colorimetric normalisation</span>
+        <span class="ldesc">Card detect → homography → illumination correction → per-device <code>RGB→CIELAB</code>. Deterministic, no learning: a least-squares colour transform is auditable in court, a CNN on raw pixels is not. Emits a calibration-quality score, so a bad capture <em>says</em> it is bad.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">L2</span>
+        <span class="lname">Classification with abstention</span>
+        <span class="ldesc">Lab values → reagent-specific decision region → a <em>prediction set</em>, not an argmax. Conformal calibration gives “wrong at most α of the time,” which survives cross-examination. “The model was 87% confident” does not.</span>
+      </div>
+
+      <div class="lgroup"><span class="eyebrow">Group B</span><span class="q">→ can this be trusted?</span></div>
+
+      <div class="layer">
+        <span class="lnum">L3</span>
+        <span class="lname">Location corroboration</span>
+        <span class="ldesc">A bare GPS fix is a number the app was handed. We capture raw GNSS with per-satellite C/N₀, Wi-Fi BSSID neighbourhood, cell IDs and kinematics — and <strong>store the disagreements</strong> rather than suppressing them.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">L4</span>
+        <span class="lname">Evidentiary binding</span>
+        <span class="ldesc">Canonical CBOR → SHA-256 → signed inside StrongBox, with a key-attestation chain to Google’s hardware root. Converts “an app claims it signed this” into “this device’s secure hardware signed this, and the key cannot be exported.”</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">L5</span>
+        <span class="lname">Append-only device ledger</span>
+        <span class="ldesc">A signature proves authorship, not <em>when</em>. <code>prev_record_hash</code> chains every record to the last, so nothing reorders, nothing silently vanishes from the middle, and a backdated insert forks the chain visibly.</span>
+      </div>
+
+      <div class="lgroup"><span class="eyebrow">Group C</span><span class="q">→ is it admissible?</span></div>
+
+      <div class="layer">
+        <span class="lnum">L6</span>
+        <span class="lname">Statutory output</span>
+        <span class="ldesc">Auto-populated <strong>BSA 2023 §63 Schedule Part A</strong> — which must state the hash value and the algorithm, both of which we compute anyway. Plus NDPS Rules 2022 linkage and an eSakshya handoff envelope. Nearly free to build once L4/L5 exist.</span>
+      </div>
+
+      <div class="lgroup"><span class="eyebrow">Group D</span><span class="q">→ why should anyone believe us?</span></div>
+
+      <div class="layer">
+        <span class="lnum">L7</span>
+        <span class="lname">Independent offline verifier</span>
+        <span class="ldesc">A separate binary that trusts neither our app nor a network: recompute the digest, verify the signature, walk the attestation chain, replay the hash chain, <strong>re-run L1/L2 from the raw frame</strong> and check the stored result reproduces. Then print what is proven, what is asserted, and what is unverifiable.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack">
+    <div class="s-head">
+      <span class="eyebrow">04 · The output</span>
+      <h2>“Inconclusive” is a feature, not a failure</h2>
+      <p class="lede">The PS demands an inconclusive category and stresses that this is a <em>presumptive</em> test — never confirmatory. Conformal prediction is what turns that third box from a softmax cutoff into a quantity with a stated error bound.</p>
+    </div>
+
+    <div class="chips">
+      <div class="chip pos">
+        <span class="label"><span class="dot"></span>POSITIVE</span>
+        <p>Singleton prediction set. One reference locus, near enough to say so.</p>
+      </div>
+      <div class="chip neg">
+        <span class="label"><span class="dot"></span>NEGATIVE</span>
+        <p>Singleton the other way. Also a real answer, also bounded.</p>
+      </div>
+      <div class="chip inc">
+        <span class="label"><span class="dot"></span>INCONCLUSIVE</span>
+        <p>Set of two, or empty. Reported <em>with the reason attached</em> — bad light, creased card, ambiguous locus.</p>
+      </div>
+    </div>
+
+    <p>This is what makes the system degrade honestly. Poor lighting or a damaged card widens the prediction set and pushes toward abstention, instead of producing a confident wrong answer in exactly the conditions where a confident wrong answer does the most damage to a real person.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wide stack">
+    <div class="s-head">
+      <span class="eyebrow">05 · Threat model</span>
+      <h2>Ten attacks, and the three we can’t stop</h2>
+      <p class="lede">We demo this instead of a confusion matrix. Every row is a live attack we run on ourselves on stage — including the last column, which is the part that makes it forensic rather than a demo.</p>
+    </div>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Adversary move</th><th>Defeated by</th><th>Residual risk</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">1</td><td class="move">Photograph a photo of a positive strip</td><td>Card must be co-planar and co-illuminated with the strip; illumination residual + screen/moiré detection</td><td class="resid">Re-photography under matched illuminant</td></tr>
+          <tr><td class="n">2</td><td class="move">Edit the image after capture</td><td><code>raw_image_sha256</code> bound into the signed record</td><td class="resid">None, if the verifier is run</td></tr>
+          <tr><td class="n">3</td><td class="move">Alter the stored result</td><td>Signature over canonical CBOR</td><td class="resid">None</td></tr>
+          <tr><td class="n">4</td><td class="move">Backdate a record</td><td>Hash chain plus anchoring window</td><td class="resid">Fabrication <em>within</em> the unanchored window</td></tr>
+          <tr><td class="n">5</td><td class="move">Delete an unfavourable test</td><td>Chain gap is visible at verification</td><td class="resid">Truncation at the head</td></tr>
+          <tr><td class="n">6</td><td class="move">Spoof GPS</td><td>Corroboration bundle; disagreements recorded, not hidden</td><td class="resid">Coordinated multi-channel spoof</td></tr>
+          <tr><td class="n">7</td><td class="move">Run on a rooted device</td><td>Verified-boot state inside the attestation record</td><td class="resid">Compromise below the TEE</td></tr>
+          <tr><td class="n">8</td><td class="move">Substitute the model to bias results</td><td><code>model_sha256</code> in the record; verifier re-runs it</td><td class="resid">None, if the verifier is run</td></tr>
+          <tr><td class="n">9</td><td class="move">Another officer signs as this operator</td><td>Biometric-gated key use; credential reference in record</td><td class="resid">Shared credentials — policy, not technical</td></tr>
+          <tr><td class="n">10</td><td class="move">Bad lighting produces a wrong positive</td><td>Conformal abstention plus calibration-quality gate</td><td class="resid">Bounded by α — and we state α</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Rows <strong>4, 5 and 9 are acknowledged residual risks</strong>. Saying so out loud is the whole difference between a forensic instrument and a science-fair project. The verifier must be as loud about what it cannot prove as about what it can — a tool that only ever prints <span class="resid">VALID ✓</span> teaches courts to over-trust it, which is worse than the subjective status quo we are replacing.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack">
+    <div class="s-head">
+      <span class="eyebrow">06 · Discipline</span>
+      <h2>What we are not claiming</h2>
+      <p class="lede">We state these in the submission, unprompted. Conceding them costs nothing and buys enormous credibility — a team that lists what it did not invent is far more believable about what it did.</p>
+    </div>
+
+    <ul class="nots">
+      <li>Photographing a colorimetric test with a phone</li>
+      <li>Using a reference card for illuminant correction</li>
+      <li>Classifying a colour change by machine learning</li>
+      <li>Recording GPS and timestamp with a field test</li>
+      <li>Digital chain of custody for drug testing</li>
+      <li>Hashing a file to detect tampering</li>
+      <li>Storing evidence in an encrypted government cloud</li>
+      <li>Any confirmatory claim — every screen says <em>presumptive</em></li>
+    </ul>
+
+    <p>What survives is narrower and, because it is narrower, defensible: a <strong>kit-agnostic</strong> measurement whose <strong>entire derivation</strong> — raw frame, calibration transform and its residual, card identity, model hash, risk level α, prediction set — is bound into one hardware-attested signature, so an independent verifier can re-execute it and confirm the conclusion reproduces. Existing systems bind an image and a result. None of them bind the <em>derivation connecting the two</em>.</p>
+
+    <p>We are also deliberately <strong>not</strong> building: a confirmatory test, any scoring system that opines on guilt or ranks people, or a second national database competing with CCTNS-2.0. Every disagreement and quality failure stays in the record precisely so the defence can use it. A forensic tool that only helps one party is not a forensic tool.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wide stack">
+    <div class="s-head">
+      <span class="eyebrow">07 · Who owns what</span>
+      <h2>Three weeks, six tracks</h2>
+      <p class="lede">The critical path is <strong>data collection</strong>, not cryptography. It is the only track that cannot be rescued by working harder in the last 48 hours — so it starts in week 1, before the pipeline it feeds even exists.</p>
+    </div>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Track</th><th>Owner</th><th>Week 1</th><th>Week 2</th><th>Week 3</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="track">A · Colour</td><td class="who">CV lead</td><td>Card + fiducials, homography, illumination correction</td><td>Device transform, Lab, quality score</td><td>Held-out-illuminant eval</td></tr>
+          <tr><td class="track">B · Classify</td><td class="who">ML</td><td>Reference loci, distance statistic</td><td>Conformal calibration</td><td>Abstention tuning, ablation</td></tr>
+          <tr><td class="track">C · Crypto</td><td class="who">Pranav</td><td>CBOR schema, StrongBox keygen, attestation</td><td>Hash chain, anchoring, FTR v1</td><td>Verifier binary</td></tr>
+          <tr><td class="track">D · App</td><td class="who">Flutter dev</td><td>Capture UX, card guidance overlay</td><td>Log, search, export</td><td>Offline queue, polish</td></tr>
+          <tr><td class="track">E · Legal</td><td class="who">1 member</td><td>Read BSA §63 Schedule + NDPS Rules 2022</td><td>Part A template, linkage fields</td><td>eSakshya envelope spec</td></tr>
+          <tr class="owned"><td class="track">F · Data<span class="crit">critical path</span></td><td class="who">2 members</td><td>Build surrogate ladders, print cards</td><td>Capture matrix — target ≥2,000 images</td><td>Degraded-condition set</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:0.6rem;">On the data, honestly</h3>
+    <p>Real NDPS kits use controlled reagents against controlled substances. A student team cannot lawfully obtain either and must not try. So we separate the optical problem from the chemical one and validate only what we can: pH indicator ladders, dye dilution series and printed Munsell patches, photographed across five-plus illuminants, three exposure biases, four angles, three device models, wet and dry surfaces, and deliberately creased or faded cards. Conformal calibration happens on a held-out <em>physical</em> split — never on synthetic augmentation.</p>
+    <p>We say this on slide two, before anyone asks: substituting NCB reagent standards is a <strong>data change, not an architecture change</strong>. L1 and L3–L7 are substance-independent by construction; L2 needs new reference loci and a recalibration pass. A judge who finds this gap themselves concludes we ignored chemistry. A team that names it and bounds it demonstrates the caution forensic work requires.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack">
+    <div class="s-head">
+      <span class="eyebrow">08 · The pitch</span>
+      <h2>Five minutes, in this order</h2>
+    </div>
+
+    <ol class="seq">
+      <li>
+        <div><h3>“Here is what already exists.”</h3>
+        <p>MobileDetect and eSakshya on one slide. This inoculates us. Every other team will claim novelty for something already sold; we will be the team that knows the market.</p></div>
+      </li>
+      <li>
+        <div><h3>“The gap is not detection, it’s admissibility.”</h3>
+        <p>Quote the PS’s own sentence back to the panel.</p></div>
+      </li>
+      <li>
+        <div><h3>“Watch it fail correctly.”</h3>
+        <p>Bad lighting in, inconclusive out — with a stated bound, not a wrong positive.</p></div>
+      </li>
+      <li>
+        <div><h3>“Now watch me attack it.”</h3>
+        <p>Run the adversary matrix live: edit the image, backdate the record, spoof the GPS, swap the model. The verifier catches each one — and says what it cannot catch.</p></div>
+      </li>
+      <li class="moment">
+        <div><h3>“And here is the certificate.”</h3>
+        <p>Print the BSA §63 Part A with the hash already filled in, and hand it to the NCB judge on paper. Everything before this is engineering. This is the moment it becomes evidence.</p></div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack">
+    <div class="s-head">
+      <span class="eyebrow">09 · Unresolved</span>
+      <h2>Open questions, with owners</h2>
+      <p class="lede">None of these block week 1. All of them block the finale.</p>
+    </div>
+
+    <ul class="oq">
+      <li><span class="who2">Legal</span><span>Exact current wording and field labels of the BSA §63 Schedule certificate — transcribe from the bare Act, not from a blog.</span></li>
+      <li><span class="who2">Legal</span><span>Whether eSakshya exposes any documented ingest interface, or whether the handoff must be a file envelope plus manual upload.</span></li>
+      <li><span class="who2">ML</span><span>Whether NCB will state the reagent set in scope — this changes the number of reference loci we need.</span></li>
+      <li><span class="who2">Crypto</span><span>Which Android API levels and StrongBox availability are realistic on issued police handsets. StrongBox is not universal; the TEE fallback must be explicit and its weaker guarantee recorded in the record rather than glossed over.</span></li>
+      <li><span class="who2">CV</span><span>Whether the reference card is printed by the officer or issued as a durable card with a registered <code>card_id</code> — the latter is stronger, but edges toward “new hardware,” which the PS forbids.</span></li>
+      <li><span class="who2">Pranav</span><span>Form field 36 — the approving faculty / IIC coordinator name, from REVA’s SIH nodal officer. And re-check the live idea count on the portal before we lock the PS in.</span></li>
+    </ul>
+  </div>
+</section>
+
+<footer class="closer">
+  <div class="wrap">
+    <p class="line">The validation does not happen <em>where it can be tampered with.</em></p>
+    <p class="foot">
+      The same sentence that carried our first patent — now pointed at a strip of paper instead of a harvest coordinate.<br>
+      SIH26231 · Digital Companion for Field Drug Testing · MHA / Narcotics Control Bureau · submission closes 30 September 2026.<br>
+      Full detail in <code>docs/ARCHITECTURE.md</code> and <code>docs/NOVELTY.md</code>.
+    </p>
+  </div>
+</footer>

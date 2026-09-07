@@ -20,6 +20,13 @@ Mirrored from [`vedantchalke36/sih-2026-problem-statements`](https://github.com/
 which scrapes the official portal at https://sih.gov.in/sih2026PS.
 Dataset licensed **CC BY 4.0** by that repository.
 
+Captured from git tree `dfe64f7694f1f40732548abe98750c20bdc36265` of that repo. To diff against a
+fresher upstream copy:
+
+```bash
+curl -s https://api.github.com/repos/vedantchalke36/sih-2026-problem-statements/git/trees/HEAD?recursive=1
+```
+
 ## ⚠️ The `ideas` field is stale
 
 `ideas` (e.g. `"1/500"`) is the submission count at scrape time — **2026-09-03**. It reads near-zero
