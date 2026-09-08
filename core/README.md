@@ -10,6 +10,7 @@ ftr/
   card.py             the printed reference card: geometry and nominal colour
   printable.py        renders it at print resolution — python -m ftr.printable
   detect.py           L1 front half: fiducials, homography, INUC, sampling, gate
+  parallax.py         two-view liveness — the defence against replay
   colorimetry.py      L1 back half + L2: device transform, CIEDE2000, conformal
   pipeline.py         one frame in, one measurement out — the code the verifier re-runs
   ingest.py           track F: survey a capture set, calibrate on a held-out illuminant
@@ -29,7 +30,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 252 tests
+.venv/bin/python -m pytest core                        # 271 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -146,6 +147,7 @@ rather than trusting the construction.
 | Gap | Status |
 |---|---|
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
+| Synchronised stereo replay | Two-view parallax refuses a print or a screen, but replaying the genuine stereo pair in step with capture is not defended. See `docs/PARALLAX.md`. |
 | Real card, real ink | No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
 | Reagent spectra | None exist publicly. Every "reaction" colour in every experiment is a ColorChecker patch standing in for chemistry. See `data/spectral/README.md`. |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
@@ -156,7 +158,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-252 Python tests, plus 65 in Dart. The ones that matter most:
+271 Python tests, plus 65 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.

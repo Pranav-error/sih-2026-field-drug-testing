@@ -25,6 +25,8 @@ Working documents for Smart India Hackathon 2026.
   claim worth making.
 - [`docs/CERTIFICATE.md`](docs/CERTIFICATE.md) — what the §63 Schedule actually asks for, and the
   record-schema gap transcribing it exposed.
+- [`docs/PARALLAX.md`](docs/PARALLAX.md) — the two-view liveness check that closes the replay hole,
+  the card change it forced, and the one replay that still works.
 - [`docs/ROBUSTNESS.md`](docs/ROBUSTNESS.md) — the operating envelope, three defects the sweep found,
   the replay attack that **defeats** the pipeline, why the learned component was dropped, and what
   changed when the camera model was replaced with measured physics.

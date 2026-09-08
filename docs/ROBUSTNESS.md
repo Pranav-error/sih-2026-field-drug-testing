@@ -126,9 +126,17 @@ field frames.
 `test_a_QUALITY_replay_defeats_the_pipeline` asserts this vulnerability
 deliberately, so it cannot be quietly forgotten.
 
+> **This has since been fixed.** Two-view parallax against a folded 8 mm liveness
+> tab refuses both attacks — print 0.1 px and screen 0.0 px against 28.2 px
+> predicted. The section below is left as written because the reasoning that
+> produced the false claim is worth more than the conclusion. See
+> [`PARALLAX.md`](PARALLAX.md), and note that a *synchronised stereo replay* is
+> still not defended.
+
 ### What would actually defend against it
 
-None of these is built, and each has a cost:
+**Option 1 was built — see [`PARALLAX.md`](PARALLAX.md).** The other two remain
+unbuilt. Each has a cost:
 
 1. **Parallax across two frames.** A real strip sits *on* the card and has
    thickness; a print is flat. Two frames from slightly different angles reveal

@@ -349,7 +349,7 @@ Present this instead of a confusion matrix. Each row is a live demo.
 
 | # | Adversary move | Defeated by | Residual risk |
 |---|---|---|---|
-| 1 | Photograph a photo of a positive strip (replay) | ~~Card must be co-planar and co-illuminated~~ **— that reasoning was wrong.** A replay reproduces the whole scene, so co-planarity is *preserved*. Cheap reproductions fail on print blur or screen subpixel structure | **NOT DEFENDED.** A photo-lab print or high-DPI screen passes, reading as an *excellent* capture (0.45 dE). Needs multi-frame parallax or a physically unclonable card. See [`ROBUSTNESS.md`](ROBUSTNESS.md) §3 |
+| 1 | Photograph a photo of a positive strip (replay) | **Two-view parallax.** Rectify both frames on the card plane; a folded 8 mm liveness tab must show the displacement the geometry predicts. A flat reproduction gives exactly zero, at any print quality. Print 0.1 px and screen 0.0 px against 28.2 px predicted — both refused. See [`PARALLAX.md`](PARALLAX.md) | **A synchronised stereo replay.** Parallax proves the scene *had* depth, not that it is there *now*. Needs the genuine stereo pair plus playback synchronised to a capture the attacker does not control — much harder than printing a photo, and still not defended |
 | 2 | Edit the image after capture | `raw_image_sha256` bound into the signed record | None if verifier is run |
 | 3 | Alter the stored result | Signature over canonical CBOR | None |
 | 4 | Backdate a record | Hash chain + anchoring window | Fabrication *within* the unanchored window |
@@ -360,12 +360,14 @@ Present this instead of a confusion matrix. Each row is a live demo.
 | 9 | Another officer signs as this operator | Biometric-gated key use; credential reference in record | Shared credentials — a policy failure, not a technical one |
 | 10 | Poor lighting produces a wrong "positive" | Conformal abstention + calibration-quality gate | Bounded by α, and the bound is stated |
 
-Rows 1, 4, 5 and 9 are **acknowledged residual risks**. Saying so out loud is the difference between a
-forensic tool and a demo.
+Rows 4, 5 and 9 are **acknowledged residual risks**, and row 1 retains a narrower one. Saying so out
+loud is the difference between a forensic tool and a demo.
 
-> Row 1 moved into this list *because it was tested*. It was previously claimed as defended, on
-> reasoning that did not survive contact with a simulated attacker. A threat model that overstates
-> its defences is worth less than no threat model at all.
+> Row 1 has been through both halves of that. It was claimed as defended on reasoning that did not
+> survive contact with a simulated attacker; it was then moved to *not defended*; and it is now
+> defended by two-view parallax — with the **synchronised stereo replay** that remains stated in the
+> residual column rather than quietly dropped. A threat model that overstates its defences is worth
+> less than no threat model at all.
 
 ---
 

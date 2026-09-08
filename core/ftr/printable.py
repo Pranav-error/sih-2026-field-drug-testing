@@ -32,8 +32,12 @@ def render_printable(spec: CardSpec = CARD_V1, dpi: int = 600, serial: str = "00
     """Render the card at print resolution, with a quiet zone and its identity."""
     ppmm = dpi / 25.4
     quiet_mm = 5.0                      # white margin: ArUco needs one to detect
+    tab_extent = 0.0
+    if spec.tab_height_mm > 0:
+        q = np.array(spec.tab_quad_mm, dtype=float)
+        tab_extent = spec.tab_height_mm + float(q[:, 1].max() - q[:, 1].min()) + 8.0
     w = int(round((spec.width_mm + 2 * quiet_mm) * ppmm))
-    h = int(round((spec.height_mm + 2 * quiet_mm) * ppmm))
+    h = int(round((spec.height_mm + tab_extent + 2 * quiet_mm) * ppmm))
     img = np.full((h, w, 3), 255, dtype=np.uint8)
     off = quiet_mm * ppmm
 
@@ -70,6 +74,37 @@ def render_printable(spec: CardSpec = CARD_V1, dpi: int = 600, serial: str = "00
     cv2.putText(img, f"batch {batch}  /  matte  /  no colour management",
                 px(21, 74), cv2.FONT_HERSHEY_SIMPLEX, scale * 0.62, (140, 140, 140),
                 max(1, int(round(0.12 * ppmm))), cv2.LINE_AA)
+
+    # The liveness flap, printed below the card and folded up and back over it.
+    if spec.tab_height_mm > 0:
+        q = np.array(spec.tab_quad_mm, dtype=float)
+        tab_w = float(q[:, 0].max() - q[:, 0].min())
+        tab_l = float(q[:, 1].max() - q[:, 1].min())
+        x0 = float(q[:, 0].min())
+        riser_y0 = spec.height_mm
+        tab_y0 = riser_y0 + spec.tab_height_mm
+
+        cv2.rectangle(img, px(x0, riser_y0), px(x0 + tab_w, tab_y0 + tab_l),
+                      (250, 250, 250), -1)
+        for y, label in ((riser_y0, "fold up"), (tab_y0, "fold over")):
+            xa, ya = px(x0, y)
+            xb, _ = px(x0 + tab_w, y)
+            for x in range(xa, xb, int(2.0 * ppmm)):
+                cv2.line(img, (x, ya), (min(x + int(1.1 * ppmm), xb), ya),
+                         (150, 150, 150), max(1, int(0.25 * ppmm)))
+            cv2.putText(img, label, px(x0 + tab_w + 1.5, y + 1.0),
+                        cv2.FONT_HERSHEY_SIMPLEX, scale * 0.5, (150, 150, 150),
+                        max(1, int(0.1 * ppmm)), cv2.LINE_AA)
+
+        m = cv2.aruco.generateImageMarker(dct, spec.tab_marker_id,
+                                          int(min(tab_w, tab_l) * 0.72 * ppmm))
+        mh = m.shape[0]
+        mx, my = px(x0 + tab_w / 2, tab_y0 + tab_l / 2)
+        img[my - mh // 2:my - mh // 2 + mh, mx - mh // 2:mx - mh // 2 + mh] = \
+            m[..., None].repeat(3, axis=2)
+        cv2.putText(img, f"liveness tab - fold to {spec.tab_height_mm:.0f} mm",
+                    px(x0, tab_y0 + tab_l + 3.5), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale * 0.55, (140, 140, 140), max(1, int(0.11 * ppmm)), cv2.LINE_AA)
 
     # trim marks at the card corners
     t = int(round(3 * ppmm))

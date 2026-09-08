@@ -53,6 +53,14 @@ class CardSpec:
     well_centre_mm: tuple[float, float]
     well_radius_mm: float
 
+    # The liveness tab: a flap on the same printed sheet, scored and folded so it
+    # stands a known height above the card plane. It is the only thing on the card
+    # that a photograph of the card cannot reproduce, because a photograph is flat.
+    # See docs/PARALLAX.md.
+    tab_height_mm: float = 0.0
+    tab_marker_id: int = 7
+    tab_quad_mm: tuple[tuple[float, float], ...] = ()
+
     # -- derived geometry --------------------------------------------------- #
 
     @property
@@ -183,4 +191,16 @@ CARD_V1 = CardSpec(
     neutral_index=tuple(range(len(_COLOUR_SRGB), len(_COLOUR_SRGB) + len(_NEUTRAL_SRGB))),
     well_centre_mm=(50.0, 70.0),
     well_radius_mm=8.0,
+    # Folds up from the bottom edge and back over the card: an 8 mm riser, then a
+    # 14 mm tab lying parallel to the card. Two score lines, no glue, no die-cut.
+    # It occupies the clear strip between the bottom-left fiducial (ends x=17) and
+    # the reaction well (starts x=42), so it obscures nothing that is measured.
+    tab_height_mm=8.0,
+    tab_marker_id=7,
+    tab_quad_mm=((21.0, 66.0), (40.0, 66.0), (40.0, 80.0), (21.0, 80.0)),
 )
+
+
+def tab_centre_mm(spec: CardSpec) -> tuple[float, float]:
+    q = np.array(spec.tab_quad_mm, dtype=float)
+    return (float(q[:, 0].mean()), float(q[:, 1].mean()))
