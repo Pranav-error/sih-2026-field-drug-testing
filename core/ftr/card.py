@@ -79,6 +79,43 @@ class CardSpec:
     def patch_centres_px(self) -> np.ndarray:
         return self.patch_centres_mm * PX_PER_MM
 
+    def substrate_points_mm(self, pitch: float = 4.0, margin: float = 2.5) -> np.ndarray:
+        """Bare-paper probe points: a dense grid avoiding every printed element.
+
+        The substrate has uniform reflectance by construction, so ANY structure
+        measured across it is illumination and nothing else. That makes it a far
+        better probe of the light field than the eight neutral patches, which are
+        too few and too far apart to notice a shadow edge falling between them.
+        """
+        pts = []
+        half = self.patch_size_mm / 2 + 1.0
+        wx, wy = self.well_centre_mm
+        s = self.marker_size_mm
+        x = margin
+        while x <= self.width_mm - margin:
+            y = margin
+            while y <= self.height_mm - margin:
+                ok = True
+                for px_, py_ in self.patch_centres_mm:
+                    if abs(x - px_) < half and abs(y - py_) < half:
+                        ok = False
+                        break
+                if ok:
+                    for ox, oy in self.marker_origins_mm:
+                        if ox - 1.5 <= x <= ox + s + 1.5 and oy - 1.5 <= y <= oy + s + 1.5:
+                            ok = False
+                            break
+                if ok and (x - wx) ** 2 + (y - wy) ** 2 < (self.well_radius_mm + 2.0) ** 2:
+                    ok = False
+                if ok:
+                    pts.append((x, y))
+                y += pitch
+            x += pitch
+        return np.array(pts, dtype=float)
+
+    def substrate_points_px(self, **kw) -> np.ndarray:
+        return self.substrate_points_mm(**kw) * PX_PER_MM
+
     def well_centre_px(self) -> tuple[float, float]:
         return (self.well_centre_mm[0] * PX_PER_MM, self.well_centre_mm[1] * PX_PER_MM)
 

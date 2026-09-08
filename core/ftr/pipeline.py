@@ -78,6 +78,8 @@ class Measurement:
             "illumination_residual_x1000": int(round(self.illumination_residual_stops * 1000)),
             "blur_x10000": int(round(self.quality.blur * 10000)),
             "clipped_x10000": int(round(self.quality.clipped_fraction * 10000)),
+            "light_field_residual_x1000": int(round(self.quality.light_field_residual_stops * 1000)),
+            "patch_spread_x10000": int(round(self.quality.patch_spread * 10000)),
             "dynamic_range_x1000": int(round(self.quality.dynamic_range * 1000)),
             "tilt_deg_x10": int(round(self.quality.tilt_degrees * 10)),
             "reprojection_px_x1000": int(round(self.quality.reprojection_px * 1000)),
@@ -114,7 +116,7 @@ def measure(image_bgr: np.ndarray, classifier: ConformalClassifier | None = None
     first = sample_patches(rect, spec)
     gain, illum_residual = estimate_illumination(first, spec)
     patches = sample_patches(rect, spec, gain=gain)
-    quality = grade_frame(rect, det, patches, illum_residual, spec)
+    quality = grade_frame(rect, det, patches, illum_residual, spec, gain=gain)
 
     transform = RootPolynomial.fit(patches.rgb, reference_xyz(spec))
     well_rgb, _ = sample_well(rect, spec, gain=gain)

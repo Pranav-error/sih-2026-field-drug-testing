@@ -23,7 +23,8 @@ from .card import PX_PER_MM, CARD_V1, CardSpec
 from .colorimetry import srgb_to_linear
 
 __all__ = ["Detection", "PatchSample", "detect_card", "rectify", "sample_patches",
-           "sample_well", "estimate_illumination", "QualityGate", "grade_frame"]
+           "sample_well", "estimate_illumination", "substrate_residual",
+           "QualityGate", "grade_frame"]
 
 
 # --------------------------------------------------------------------------- #
@@ -134,7 +135,10 @@ def _trimmed_mean(block: np.ndarray, trim: float = 0.25) -> tuple[np.ndarray, fl
     k = int(len(order) * trim / 2)
     keep = flat[order[k:len(order) - k]] if len(order) > 4 * k > 0 else flat
     sat = float(np.mean(np.any(flat >= 0.99, axis=1)))
-    return keep.mean(axis=0), sat, float(keep.std())
+    # Per-channel spread, then averaged. Taking the std over all three channels
+    # together would measure the patch's *colour* — a purple patch has R != G != B
+    # and would look noisy while being perfectly clean.
+    return keep.mean(axis=0), sat, float(keep.std(axis=0).mean())
 
 
 def sample_patches(rectified_bgr: np.ndarray, spec: CardSpec = CARD_V1,
@@ -253,6 +257,47 @@ def estimate_illumination(sample: PatchSample, spec: CardSpec = CARD_V1) -> tupl
     return coeffs, residual
 
 
+def substrate_residual(rectified_bgr: np.ndarray, gain: np.ndarray,
+                       spec: CardSpec = CARD_V1) -> float:
+    """How well the fitted light field explains the bare card, in stops.
+
+    The eight neutral patches are enough to *fit* a smooth surface and far too few
+    to *test* one: a shadow edge falling between them is invisible to the fit
+    residual, and a synthetic hard shadow was accepted at 17 dE of error before
+    this existed.
+
+    The card substrate is uniform paper, so after dividing out the fitted gain
+    every probe point should read the same value — the paper's reflectance. The
+    spread of what remains is illumination the model failed to capture. A smooth
+    gradient leaves almost nothing; a step leaves a bimodal residual and a large
+    spread.
+    """
+    rgb = cv2.cvtColor(rectified_bgr, cv2.COLOR_BGR2RGB).astype(np.float64) / 255.0
+    lin = srgb_to_linear(rgb)
+    lum = lin @ np.array([0.2126, 0.7152, 0.0722])
+
+    pts = spec.substrate_points_px()
+    if len(pts) < 16:
+        return 0.0
+    xs = np.clip(pts[:, 0].astype(int), 0, lum.shape[1] - 1)
+    ys = np.clip(pts[:, 1].astype(int), 0, lum.shape[0] - 1)
+
+    # Small median patch per probe, so a dust speck does not become a finding.
+    vals = []
+    for x, y in zip(xs, ys):
+        block = lum[max(0, y - 4):y + 5, max(0, x - 4):x + 5]
+        vals.append(np.median(block) if block.size else 0.0)
+    vals = np.asarray(vals)
+
+    g = _gain_at(gain, np.stack([xs, ys], axis=1).astype(float), spec)
+    gl = g @ np.array([0.2126, 0.7152, 0.0722])
+
+    ratio = np.clip(vals, 1e-6, None) / np.clip(gl, 1e-6, None)
+    logs = np.log2(ratio)
+    # Robust spread: a few clipped or occluded probes must not dominate.
+    return float((np.percentile(logs, 90) - np.percentile(logs, 10)) / 2.0)
+
+
 # --------------------------------------------------------------------------- #
 # quality
 # --------------------------------------------------------------------------- #
@@ -268,6 +313,8 @@ class QualityGate:
     clipped_fraction: float
     dynamic_range: float
     illumination_residual_stops: float
+    light_field_residual_stops: float
+    patch_spread: float
 
     # Thresholds are policy, not physics. They live here so a change is one edit
     # and shows up in review, rather than being scattered through the pipeline.
@@ -278,6 +325,19 @@ class QualityGate:
     MAX_CLIPPED = 0.02
     MIN_DYNAMIC_RANGE = 0.35
     MAX_ILLUM_RESIDUAL = 0.35
+    # Measured across 196 substrate probes, not 8 patches. On synthetic frames an
+    # ideal capture leaves 0.04 and a legitimate soft shadow 0.06, while a hard
+    # shadow edge leaves 0.36 and up. 0.12 sits in that gap.
+    #
+    # ⚠ This threshold is calibrated on SYNTHETIC frames. Real paper texture,
+    # print non-uniformity and lens vignetting will all raise the floor. Re-derive
+    # it from the physical capture set (docs/CAPTURE.md) before quoting any
+    # rejection rate — a threshold tuned on simulations is a guess about reality.
+    MAX_LIGHT_FIELD_RESIDUAL = 0.12
+    # Within-patch spread, per channel, relative to patch brightness. Rises with
+    # sensor noise, which corrupts colour without blurring the frame — so nothing
+    # else in this gate notices it. Same synthetic-calibration caveat applies.
+    MAX_PATCH_SPREAD = 0.30
 
     def failures(self) -> list[str]:
         f = []
@@ -298,6 +358,12 @@ class QualityGate:
         if self.illumination_residual_stops > self.MAX_ILLUM_RESIDUAL:
             f.append(f"light is not smooth across the card "
                      f"({self.illumination_residual_stops:.2f} stops after correction)")
+        if self.light_field_residual_stops > self.MAX_LIGHT_FIELD_RESIDUAL:
+            f.append(f"a shadow or highlight edge crosses the card "
+                     f"({self.light_field_residual_stops:.2f} stops unexplained)")
+        if self.patch_spread > self.MAX_PATCH_SPREAD:
+            f.append(f"patch colour is not uniform ({self.patch_spread:.3f}) — "
+                     "heavy compression or sensor noise")
         return f
 
     @property
@@ -314,21 +380,29 @@ class QualityGate:
             return "Too bright. Move out of direct light, or shade the card with your hand."
         if self.blur < self.MIN_BLUR:
             return "Hold steady, or move slightly further away to focus."
+        if self.light_field_residual_stops > self.MAX_LIGHT_FIELD_RESIDUAL:
+            return "A shadow edge crosses the card. Move so the light is even across all of it."
         if self.illumination_residual_stops > self.MAX_ILLUM_RESIDUAL:
             return "The light is uneven — move your shadow, or the reflection, off the card."
+        if self.patch_spread > self.MAX_PATCH_SPREAD:
+            return "The image is too grainy. Find more light and hold steady."
         if self.dynamic_range < self.MIN_DYNAMIC_RANGE:
             return "Find more light."
         return "Hold steady."
 
 
 def grade_frame(rectified_bgr: np.ndarray, det: Detection, sample: PatchSample,
-                illum_residual: float, spec: CardSpec = CARD_V1) -> QualityGate:
+                illum_residual: float, spec: CardSpec = CARD_V1,
+                gain: np.ndarray | None = None) -> QualityGate:
     grey = cv2.cvtColor(rectified_bgr, cv2.COLOR_BGR2GRAY).astype(np.float64) / 255.0
     lap = cv2.Laplacian(grey, cv2.CV_64F)
     # Normalised by contrast so a low-contrast-but-sharp frame is not called soft.
     blur = float(lap.var() / max(grey.var(), 1e-6))
 
     lum = sample.raw_rgb @ np.array([0.2126, 0.7152, 0.0722])
+    field = 0.0 if gain is None else substrate_residual(rectified_bgr, gain, spec)
+    # Relative, so a dark patch and a bright one are judged on the same scale.
+    rel_spread = float(np.mean(sample.spread / np.clip(lum, 1e-3, None)))
     return QualityGate(
         markers_found=len(det.markers_found),
         reprojection_px=det.reprojection_px,
@@ -337,4 +411,6 @@ def grade_frame(rectified_bgr: np.ndarray, det: Detection, sample: PatchSample,
         clipped_fraction=float(sample.saturated.mean()),
         dynamic_range=float(lum.max() - lum.min()),
         illumination_residual_stops=illum_residual,
+        light_field_residual_stops=field,
+        patch_spread=rel_spread,
     )

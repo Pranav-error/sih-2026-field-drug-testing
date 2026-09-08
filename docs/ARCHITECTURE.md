@@ -349,7 +349,7 @@ Present this instead of a confusion matrix. Each row is a live demo.
 
 | # | Adversary move | Defeated by | Residual risk |
 |---|---|---|---|
-| 1 | Photograph a photo of a positive strip (replay) | Card must be co-planar and co-illuminated with the strip; INUC residual + moiré/screen detection | Sophisticated re-photography under matched illuminant |
+| 1 | Photograph a photo of a positive strip (replay) | ~~Card must be co-planar and co-illuminated~~ **— that reasoning was wrong.** A replay reproduces the whole scene, so co-planarity is *preserved*. Cheap reproductions fail on print blur or screen subpixel structure | **NOT DEFENDED.** A photo-lab print or high-DPI screen passes, reading as an *excellent* capture (0.45 dE). Needs multi-frame parallax or a physically unclonable card. See [`ROBUSTNESS.md`](ROBUSTNESS.md) §3 |
 | 2 | Edit the image after capture | `raw_image_sha256` bound into the signed record | None if verifier is run |
 | 3 | Alter the stored result | Signature over canonical CBOR | None |
 | 4 | Backdate a record | Hash chain + anchoring window | Fabrication *within* the unanchored window |
@@ -360,8 +360,12 @@ Present this instead of a confusion matrix. Each row is a live demo.
 | 9 | Another officer signs as this operator | Biometric-gated key use; credential reference in record | Shared credentials — a policy failure, not a technical one |
 | 10 | Poor lighting produces a wrong "positive" | Conformal abstention + calibration-quality gate | Bounded by α, and the bound is stated |
 
-Rows 4, 5 and 9 are **acknowledged residual risks**. Saying so out loud is the difference between a
+Rows 1, 4, 5 and 9 are **acknowledged residual risks**. Saying so out loud is the difference between a
 forensic tool and a demo.
+
+> Row 1 moved into this list *because it was tested*. It was previously claimed as defended, on
+> reasoning that did not survive contact with a simulated attacker. A threat model that overstates
+> its defences is worth less than no threat model at all.
 
 ---
 
@@ -381,9 +385,12 @@ harder in the last 48 hours. Start it in week 1, before the pipeline exists.
 
 ### Stack
 
-Flutter (Android-first) · OpenCV via FFI for L1 · TFLite for L2 if a learned component survives
-ablation · Android Keystore/StrongBox for L4 · CBOR + SHA-256 · verifier in Python (reference) and
-Dart (in-app) — two independent implementations, because a single implementation that agrees with
+Flutter (Android-first) · OpenCV via FFI for L1 · ~~TFLite for L2 if a learned component survives
+ablation~~ — **it did not: see [`ROBUSTNESS.md`](ROBUSTNESS.md) §4.** Nearest-locus ΔE2000 beats both
+Mahalanobis and logistic regression on a held-out illuminant, and is the only one a defence expert
+can recompute on paper. **L2 stays closed-form; there is no learned component and no TFLite
+dependency.** · Android Keystore/StrongBox for L4 · CBOR + SHA-256 · verifier in Python (reference)
+and Dart (in-app) — two independent implementations, because a single implementation that agrees with
 itself proves nothing.
 
 ---
