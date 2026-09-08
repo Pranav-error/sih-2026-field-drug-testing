@@ -1,0 +1,176 @@
+/// Field Companion — SIH26231.
+///
+/// The capture spine wired end to end: standby, capture, result, sealed. The
+/// camera and the colour pipeline are not here yet; the sealing is real, and goes
+/// through the same `ftr_verify` package the reference verifier reads, so a record
+/// this app produces can be checked by either implementation.
+///
+/// What is deliberately NOT here:
+///
+///  * a software key that pretends to be StrongBox. The standby screen says
+///    plainly that this build's records are not evidence, and both verifiers
+///    reject them.
+///  * any way to edit or delete a sealed record.
+library;
+
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:ftr_verify/ftr_verify.dart' as ftr;
+
+import 'src/models.dart';
+import 'src/screens.dart';
+import 'src/tokens.dart';
+
+void main() => runApp(const FieldCompanionApp());
+
+class FieldCompanionApp extends StatelessWidget {
+  const FieldCompanionApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Field Companion',
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      home: const CaptureFlow(),
+    );
+  }
+}
+
+enum Step { standby, capture, result, sealed }
+
+class CaptureFlow extends StatefulWidget {
+  const CaptureFlow({super.key});
+
+  @override
+  State<CaptureFlow> createState() => _CaptureFlowState();
+}
+
+class _CaptureFlowState extends State<CaptureFlow> {
+  Step _step = Step.standby;
+
+  // A development key. It reports SOFTWARE, and everything downstream — this
+  // app's own standby screen included — treats that as disqualifying.
+  final _keystore = ftr.SoftwareKeystore();
+
+  Uint8List _chainHead = ftr.genesisHash;
+  int _sequence = 0;
+  String _digestHex = '';
+
+  // Stands in for the live camera. The real overlay is fed by the native L1
+  // pipeline over a platform channel; the widget only ever renders what it is given.
+  double _progress = 0;
+
+  CaptureQuality get _quality => CaptureQuality(
+        fiducialsFound: (_progress * 4).clamp(0, 4).round(),
+        illumination: 0.70 + 0.28 * _progress,
+        focus: 0.40 + 0.56 * _progress,
+        tiltDegrees: 16 - 13 * _progress,
+        clippedFraction: 0,
+      );
+
+  DevicePosture get _posture => DevicePosture(
+        securityLevel: _keystore.attestation().securityLevel,
+        verifiedBootState: _keystore.attestation().verifiedBootState,
+        bootloaderLocked: _keystore.attestation().bootloaderLocked,
+        osPatchLevel: _keystore.attestation().osPatchLevel,
+        mockLocation: false,
+        recordCount: _sequence,
+        unanchored: _sequence,
+        sinceAnchor: Duration(minutes: 4 * _sequence),
+      );
+
+  static const _result = TestResult(
+    predictionSet: ['opiate_class', 'amphetamine_class'],
+    label: null,
+    lab: [21.6, 19.4, -6.1],
+    alpha: 0.05,
+    threshold: 5.53,
+    scores: {'opiate_class': 4.12, 'amphetamine_class': 5.02, 'negative': 46.8},
+  );
+
+  void _seal() {
+    final frame = Uint8List.fromList('frame $_sequence'.codeUnits);
+    final body = ftr.buildBody(
+      recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
+      sequence: _sequence,
+      prevRecordHash: _chainHead,
+      capturedAt: {'device_clock': DateTime.now().toIso8601String()},
+      operator_: {'id': 'NCB/BLR/2291', 'biometric_unlock_used': true},
+      kit: {'reagent_type': 'marquis'},
+      card: {'card_id': 'CARD-IN-2026-0417', 'print_batch': 'B12'},
+      capture: {'raw_image_sha256': ftr.sha256(frame)},
+      colorimetry: {
+        'measured': true,
+        'lab_x100': _result.lab!.map((v) => (v * 100).round()).toList(),
+        'gate_passed': true,
+      },
+      classification: {
+        'alpha_x1000': (_result.alpha * 1000).round(),
+        'prediction_set': _result.predictionSet,
+        'label': _result.label,
+      },
+      locationBundle: const {'corroboration_channels_agreeing': 4,
+        'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
+      device: const {'verified_boot_state': 'UNKNOWN', 'bootloader_state': 'UNKNOWN'},
+    );
+
+    final rec = ftr.seal(body, _keystore);
+    setState(() {
+      _digestHex = ftr.hex(rec.digest);
+      _chainHead = rec.digest;
+      _sequence += 1;
+      _step = Step.sealed;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_step) {
+      case Step.standby:
+        return StandbyScreen(
+          posture: _posture,
+          onBegin: () => setState(() {
+            _progress = 0;
+            _step = Step.capture;
+          }),
+        );
+      case Step.capture:
+        return Stack(children: [
+          CaptureScreen(
+            quality: _quality,
+            onCapture: () => setState(() => _step = Step.result),
+          ),
+          // Stands in for the camera settling. Removed with the platform channel.
+          Positioned(
+            right: 16,
+            bottom: 96,
+            child: FloatingActionButton.small(
+              tooltip: 'Simulate the frame settling',
+              onPressed: () => setState(() => _progress = (_progress + 0.34).clamp(0, 1)),
+              child: const Icon(Icons.center_focus_strong),
+            ),
+          ),
+        ]);
+      case Step.result:
+        return ResultScreen(result: _result, onSeal: _seal);
+      case Step.sealed:
+        return Scaffold(
+          body: SealedScreen(
+            digestHex: _digestHex,
+            sequence: _sequence - 1,
+            securityLevel: _posture.securityLevel,
+            anchorWindow: _posture.anchorWindow,
+            anchored: false,
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => setState(() => _step = Step.standby),
+            label: const Text('Done'),
+            icon: const Icon(Icons.check),
+          ),
+        );
+    }
+  }
+}

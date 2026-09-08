@@ -26,3 +26,12 @@ echo "  python: $py"
 echo "  dart:   $da"
 [ "$py" = "$da" ] || { echo "VERDICTS DISAGREE — this is the failure the two implementations exist to catch"; exit 1; }
 echo "  verdicts agree"
+
+echo
+echo "== dart seals, python verifies (the direction that matters) =="
+(cd dart/ftr_verify && dart run bin/gen_dart_chain.dart ../../core/tests/vectors/dart_sealed >/dev/null)
+.venv/bin/python -m pytest core/tests/test_dart_interop.py -q
+
+echo
+echo "== flutter app =="
+(cd app && flutter test --reporter=compact 2>&1 | tail -2)

@@ -19,3 +19,10 @@ docs/preview-*.png
 # Dart
 dart/**/.dart_tool/
 dart/**/build/
+
+# Flutter
+app/build/
+app/.dart_tool/
+app/.flutter-plugins*
+app/**/local.properties
+app/**/GeneratedPluginRegistrant.*

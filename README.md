@@ -32,7 +32,9 @@ Working documents for Smart India Hackathon 2026.
   the append-only ledger, the colorimetry pipeline, the capture tooling, the §63 certificate
   emitter, and the independent verifier. 199 tests.
 - [`dart/ftr_verify/`](dart/ftr_verify/README.md) — the **second** verifier, written independently
-  in Dart with no shared code or dependencies. 65 tests, reading vectors the Python side wrote.
+  in Dart with no shared code or dependencies, plus the sealing path the app uses. 65 tests.
+- [`app/`](app/README.md) — the Flutter client. Capture spine implemented and sealing is real;
+  camera and StrongBox are not. 21 tests, each asserting a rule from `DESIGN.md`.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
@@ -62,7 +64,7 @@ No new hardware. A printed colour card and a phone.
 | C — crypto / provenance | **Implemented, twice.** `core/ftr` in Python and `dart/ftr_verify` in Dart, independently written, cross-checked against shared vectors. |
 | A — colour pipeline | **Implemented.** Fiducial detection, homography, illumination correction, patch sampling, quality gate, device transform. Worst error on an accepted frame: 0.76 dE2000 — on synthetic frames only. |
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
-| D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. The in-app verifier (Dart) exists. |
+| D — app | **Capture spine built.** Standby → capture → result → sealed, with real sealing through the shared package; records it produces verify in Python. Camera, native L1 and StrongBox are not wired, and it has never been run on a handset. |
 | E — legal / statutory | **Emitter built, statute not yet read.** Certificates render with real computed values and are stamped DRAFT — NOT FOR FILING because the field labels are unverified paraphrases. Remaining work is a transcription into `core/ftr/data/bsa63_schedule.json`. |
 | F — data | **Not started, and it is the critical path.** Card is printable and the ingest tooling is built (`ftr.ingest survey` / `calibrate`, see `docs/CAPTURE.md`); no physical card has been photographed yet. |
 

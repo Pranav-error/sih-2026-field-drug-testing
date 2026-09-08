@@ -82,6 +82,29 @@ eleven orders of magnitude below the coarsest quantum. That is what the record i
 allowed to claim, and [`../../docs/DETERMINISM.md`](../../docs/DETERMINISM.md)
 works through why the stronger-sounding original wording was not defensible.
 
+## Sealing, and why the app writes through this package
+
+`lib/src/seal.dart` builds and seals records, which is what the app does on a
+handset. Two directions are now tested, and the second is the one that matters:
+
+| Direction | Where |
+|---|---|
+| Python seals → Dart verifies | `test/cross_implementation_test.dart` |
+| **Dart seals → Python verifies** | `core/tests/test_dart_interop.py` |
+
+A format only one implementation can *write* is not a format, and the app is the
+writer. The interop fixture is deterministic (fixed keystore seed) so it can be
+committed and a diff means something:
+
+```sh
+dart run bin/gen_dart_chain.dart ../../core/tests/vectors/dart_sealed
+```
+
+Signatures PointyCastle produces are accepted by OpenSSL through Python's
+`cryptography`, and the bytes Dart encodes re-encode identically in Python. A
+software-keyed record still fails verification in both, regardless of which side
+sealed it.
+
 ## Not implemented here
 
 This package cannot **find the card in a photograph** — fiducial detection,
