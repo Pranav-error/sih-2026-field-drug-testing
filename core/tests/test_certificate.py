@@ -28,32 +28,57 @@ def record(tmp_path):
 
 @pytest.fixture
 def verified_schedule():
-    """The shipped schedule with verified flipped on — what it looks like once
-    track E has transcribed the Act."""
+    """The shipped Schedule with verification flipped to official — what it looks
+    like once someone has checked it against the Gazette."""
     raw = json.loads(SCHEDULE_PATH.read_text())
     raw["verified"] = True
-    raw["source"] = "Bharatiya Sakshya Adhiniyam 2023, bare Act"
-    raw["transcribed_by"] = "test"
+    raw["verification_level"] = "official"
+    raw["source"] = "eGazette PDF of the Act"
     return Schedule(raw)
 
 
 # --- the three rules ------------------------------------------------------- #
 
-def test_the_shipped_schedule_is_marked_unverified():
-    """If this ever fails without a transcription, someone flipped a flag they
-    should not have. The labels are paraphrases until the Act is read."""
+def test_the_shipped_schedule_is_transcribed_but_not_gazette_verified():
+    """The labels are a real transcription now, not paraphrases — but from a
+    secondary source. If this ever fails without someone checking the Gazette,
+    a flag was flipped that should not have been."""
     s = Schedule.load()
     assert not s.verified
-    assert s.raw["source"] is None
-    assert "UNVERIFIED" in " ".join(s.raw["_README"])
+    assert s.verification_level == "secondary"
+    assert s.raw["source"], "a transcription must name where it came from"
 
 
-def test_an_unverified_schedule_produces_a_draft(record):
+def test_the_schedule_matches_the_structure_the_act_prescribes():
+    """Two parts, Part A by the party and Part B by an expert, and BOTH state the
+    hash. Getting the part assignment wrong would put the wrong person's oath on
+    the wrong statement."""
+    s = Schedule.load()
+    parts = s.parts
+    assert [p["id"] for p in parts] == ["part_a", "part_b"]
+    assert "Party" in parts[0]["subtitle"]
+    assert "Expert" in parts[1]["subtitle"]
+    for p in parts:
+        kinds = [i["kind"] for i in p["items"]]
+        assert "hash" in kinds, f"{p['id']} must state the hash value"
+        assert "signature" in kinds
+
+
+def test_sha256_is_an_algorithm_the_schedule_itself_names():
+    """One reason the record uses SHA-256 rather than something exotic."""
+    s = Schedule.load()
+    assert "SHA256" in s.raw["algorithms_named_in_the_schedule"]
+    for _, item in s.items():
+        if item["kind"] == "hash":
+            assert "SHA256" in item["algorithms"]
+
+
+def test_a_secondary_source_still_produces_a_draft(record):
     cert = build_certificate(record)
     assert cert.is_draft
     text = cert.text()
     assert "DRAFT — NOT FOR FILING" in text
-    assert "transcribe the Schedule" in text
+    assert "official Gazette" in text, "the banner must name what is still missing"
     assert cert.status == "DRAFT — NOT FOR FILING"
 
 
@@ -65,54 +90,94 @@ def test_a_verified_schedule_drops_the_draft_banner(record, verified_schedule):
 
 
 def test_the_app_never_fills_a_field_a_person_must_attest(record, verified_schedule):
-    """Rule 1. An auto-filled signature line is a forgery mechanism."""
+    """Rule 1. The Schedule's declarations begin "I do hereby solemnly affirm" —
+    precisely the things no program may assert on someone's behalf."""
     cert = build_certificate(record, verified_schedule)
-    for part in ("part_a", "part_b"):
-        for f in verified_schedule.fields(part):
-            if f["filled_by"] == "person":
-                assert f["key"] not in cert.values, f"{f['key']} must be left to a human"
-                assert f["key"] in cert.blanks
+    for _, item in verified_schedule.items():
+        if item["filled_by"] == "person":
+            assert item["key"] not in cert.values, f"{item['key']} must be left to a human"
+            assert item["key"] in cert.blanks
+
+
+def test_no_oath_or_signature_is_ever_machine_filled(record, verified_schedule):
+    cert = build_certificate(record, verified_schedule)
+    for _, item in verified_schedule.items():
+        if item["kind"] in ("signature", "datetimeplace"):
+            assert item["key"] not in cert.values
+    text = cert.text()
+    assert "[ to be signed by hand ]" in text
+    assert "solemnly affirm" in text
 
 
 def test_part_b_is_left_entirely_to_the_expert(record, verified_schedule):
+    """Part B is the expert's oath. The app populates none of it — including the
+    hash, which the expert must state on their own responsibility."""
     cert = build_certificate(record, verified_schedule)
-    for f in verified_schedule.fields("part_b"):
-        assert f["key"] not in cert.values
-    assert "[ to be completed by hand ]" in cert.text()
+    for part in verified_schedule.parts:
+        if part["id"] != "part_b":
+            continue
+        for item in part["items"]:
+            assert item["key"] not in cert.values, f"{item['key']} is the expert's to state"
 
 
-def test_nothing_is_asserted_that_the_record_does_not_carry(tmp_path, verified_schedule):
-    """Rule 2. A missing operator id must not become an empty string that later
-    reads as a positive statement about who held the device."""
-    ks = SimulatedHardwareKeystore(tmp_path / "k.pem")
+def test_statutory_fields_the_record_cannot_supply_are_named(record, verified_schedule):
+    """Rule 2, made mechanical.
+
+    Transcribing the real Schedule exposed a gap: the FTR schema was written before
+    anyone had read what the certificate actually asks for, and it carries no make,
+    model, serial number or IMEI. Rather than leaving that to be discovered by a
+    magistrate, the certificate names it.
+    """
+    cert = build_certificate(record, verified_schedule)
+    assert cert.missing_from_record, "the gap must be reported, not silently blank"
+    assert any("Make & Model" in m for m in cert.missing_from_record)
+    assert any("IMEI" in m for m in cert.missing_from_record)
+    text = cert.text()
+    assert "Statutory fields the record cannot supply" in text
+    assert "record schema extended" in text
+
+
+def test_a_record_that_carries_device_identity_closes_the_gap(tmp_path, verified_schedule):
+    """And when the schema is extended, the gap disappears without a code change."""
+    ks = SimulatedHardwareKeystore(tmp_path / "k2.pem")
     f = sample_ftr()
-    f.operator = {"biometric_unlock_used": False}      # no id at all
-    f.captured_at = {"uptime_ms": 1}                    # no device clock
+    f.device = {
+        **f.device,
+        "make_model": "Google Pixel 7a",
+        "serial_number": "1A2B3C4D",
+        "device_identifier": "IMEI 350000000000001",
+    }
     rec = seal(f, b"\x00" * 32, 0, ks)
 
     cert = build_certificate(rec, verified_schedule)
-    assert "device_operator" not in cert.values
-    assert "period_of_use" not in cert.values
-    assert "device_operator" in cert.blanks
+    assert cert.missing_from_record == []
+    assert cert.values["make_model"] == "Google Pixel 7a"
+    assert "IMEI 350000000000001" in cert.text()
 
 
 # --- the statutory requirement --------------------------------------------- #
 
-def test_the_certificate_states_the_hash_and_the_algorithm(record, verified_schedule):
-    """The one §63 requirement we are confident of: hash value plus algorithm."""
+def test_the_certificate_states_the_hash_and_ticks_the_algorithm(record, verified_schedule):
+    """The requirement the Schedule states in both parts."""
     cert = build_certificate(record, verified_schedule)
     assert cert.values["hash_value"] == record.digest.hex()
-    assert "SHA-256" in cert.values["hash_algorithm"]
-    assert record.digest.hex() in cert.text()
+    assert cert.values["hash_value__algorithm"] == "SHA256"
+    text = cert.text()
+    assert record.digest.hex() in text
+    assert "[X] SHA256" in text, "the algorithm box must actually be ticked"
+    assert "Hash report to be enclosed" in text
 
 
-def test_the_certificate_never_claims_a_period_of_regular_use_it_cannot_evidence(record, verified_schedule):
-    """One record is one moment. Claiming an unevidenced period would be the kind
-    of boilerplate that gets a certificate thrown out."""
+def test_the_device_type_tick_box_says_mobile(record, verified_schedule):
+    text = build_certificate(record, verified_schedule).text()
+    assert "[X] Mobile" in text
+
+
+def test_the_ledger_position_reaches_the_certificate(record, verified_schedule):
+    """The record's position in the append-only ledger is what actually bounds
+    when it was created, so it goes in the free-text device field."""
     cert = build_certificate(record, verified_schedule)
-    period = cert.values["period_of_use"]
-    assert "not independently corroborated" in period
-    assert "ledger bounds when it was created" in period
+    assert "append-only ledger" in cert.values["other_device_information"]
 
 
 def test_the_certificate_says_presumptive_on_its_face(record, verified_schedule):
@@ -123,7 +188,7 @@ def test_the_certificate_says_presumptive_on_its_face(record, verified_schedule)
 
 def test_the_security_level_reaches_the_certificate(record, verified_schedule):
     cert = build_certificate(record, verified_schedule)
-    assert "STRONGBOX" in cert.values["device_particulars"]
+    assert "STRONGBOX" in cert.values["other_device_information"]
 
 
 # --- the eSakshya envelope ------------------------------------------------- #

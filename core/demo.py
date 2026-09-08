@@ -97,7 +97,13 @@ def make_record(m, frame_bytes: bytes, agreeing: int = 4, indicators=()) -> FTR:
                          "spoof_indicators": list(indicators)},
         device={"android_id_hash": hashlib.sha256(b"dev").digest(),
                 "os_patch_level": "2026-08-01", "bootloader_state": "LOCKED",
-                "verified_boot_state": "GREEN"},
+                "verified_boot_state": "GREEN",
+                # Required by the Schedule to BSA s.63 — see docs/CERTIFICATE.md.
+                # The FTR schema originally lacked these; transcribing the Act
+                # was what revealed the certificate could not be completed.
+                "make_model": "Google Pixel 7a",
+                "serial_number": "1A2B3C4D5E",
+                "device_identifier": "IMEI 350000000000001"},
         ndps={"seizure_memo_ref": "SM-2026-0913-07", "sample_ids": ["S1", "S2"]},
         omitted=["kit.lot"],
     )

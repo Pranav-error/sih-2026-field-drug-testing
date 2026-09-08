@@ -147,7 +147,7 @@ rather than trusting the construction.
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
 | Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
-| BSA §63 certificate emitter | **Built, and deliberately stamped DRAFT.** The statutory field *labels* are unverified paraphrases; every computed value is real. Track E transcribes the Schedule into `ftr/data/bsa63_schedule.json` and flips one flag. |
+| BSA §63 certificate emitter | **Built; Schedule transcribed from a bare-Act repository.** Still stamped DRAFT until someone compares it against the eGazette PDF and flips `verification_level` to `official`. See `docs/CERTIFICATE.md`. |
 | eSakshya ingest interface | Envelope is well-formed and marked PROVISIONAL. Nobody has yet established whether a documented ingest interface exists (§13 q2). |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
 | Dart implementation | **Done** — `dart/ftr_verify`, including L1's colour transform and L2. It cannot yet find the card in a photograph (ArUco is native), so it reproduces a *measurement* but not yet a *frame*. |

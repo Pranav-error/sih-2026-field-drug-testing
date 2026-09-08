@@ -404,7 +404,12 @@ itself proves nothing.
 
 ## 13. Open questions to resolve before the finale
 
-1. Exact current wording and field labels of the BSA Schedule certificate (read the bare Act).
+1. ~~Exact current wording and field labels of the BSA Schedule certificate (read the bare Act).~~
+   **Transcribed** — see [`CERTIFICATE.md`](CERTIFICATE.md). Two parts confirmed (Part A by *the
+   Party*, Part B by *the Expert*); **both** state the hash; SHA256 is named in the Schedule itself.
+   Transcription is from a bare-Act repository, not the Gazette, so certificates remain stamped
+   DRAFT. **Remaining: one comparison against the eGazette PDF.** Transcribing it also exposed that
+   the FTR carried no make/model/serial/IMEI, which the certificate requires — now added.
 2. Whether eSakshya exposes any documented ingest interface, or whether the handoff must be a file
    envelope plus manual upload.
 3. Whether NCB will state the reagent set in scope — this changes the number of reference loci.

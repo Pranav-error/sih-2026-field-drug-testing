@@ -35,6 +35,8 @@ def sample_ftr(label: str = "positive", **over) -> FTR:
         device={"android_id_hash": hashlib.sha256(b"dev").digest(),
                 "os_patch_level": "2026-08-01", "bootloader_state": "LOCKED",
                 "verified_boot_state": "GREEN"},
+        # Deliberately WITHOUT make_model / serial_number / device_identifier, so
+        # the default fixture exercises the missing-field path the Schedule exposed.
         ndps={"seizure_memo_ref": "SM-2026-0913-07", "sample_ids": ["S1", "S2"]},
         omitted=["kit.lot"],
     )

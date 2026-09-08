@@ -23,6 +23,8 @@ Working documents for Smart India Hackathon 2026.
   measured across the two implementations rather than assumed.
 - [`docs/CAPTURE.md`](docs/CAPTURE.md) — the capture protocol for track F, and the only accuracy
   claim worth making.
+- [`docs/CERTIFICATE.md`](docs/CERTIFICATE.md) — what the §63 Schedule actually asks for, and the
+  record-schema gap transcribing it exposed.
 - [`docs/app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype with the
   rationale beside each screen.
 
@@ -65,7 +67,7 @@ No new hardware. A printed colour card and a phone.
 | A — colour pipeline | **Implemented.** Fiducial detection, homography, illumination correction, patch sampling, quality gate, device transform. Worst error on an accepted frame: 0.76 dE2000 — on synthetic frames only. |
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
 | D — app | **Capture spine built.** Standby → capture → result → sealed, with real sealing through the shared package; records it produces verify in Python. Camera, native L1 and StrongBox are not wired, and it has never been run on a handset. |
-| E — legal / statutory | **Emitter built, statute not yet read.** Certificates render with real computed values and are stamped DRAFT — NOT FOR FILING because the field labels are unverified paraphrases. Remaining work is a transcription into `core/ftr/data/bsa63_schedule.json`. |
+| E — legal / statutory | **Emitter built, Schedule transcribed.** The certificate now carries the Act's real field labels, ticks SHA256 as the Schedule names it, and reports which statutory fields the record cannot supply. Still stamped DRAFT — the transcription is from a bare-Act repository, not the Gazette. Remaining work: one comparison against the eGazette PDF. See `docs/CERTIFICATE.md`. |
 | F — data | **Not started, and it is the critical path.** Card is printable and the ingest tooling is built (`ftr.ingest survey` / `calibrate`, see `docs/CAPTURE.md`); no physical card has been photographed yet. |
 
 Track F cannot be compressed by working harder in the last 48 hours. It is the one to start next.

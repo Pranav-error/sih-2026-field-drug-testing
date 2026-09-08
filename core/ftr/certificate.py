@@ -1,31 +1,34 @@
 """L6 — the statutory output.
 
 Section 63 of the Bharatiya Sakshya Adhiniyam 2023 replaced section 65B of the
-Indian Evidence Act with effect from 1 July 2024. Its certificate comes in two
-parts — one completed by the person in charge of the device, one by an expert —
-and it must state **the hash value of the record and the algorithm used**.
+Indian Evidence Act with effect from 1 July 2024. The Schedule to the Act — "[See
+section 63(4)(c)]" — sets out a two-part certificate: Part A completed by the
+party producing the record, Part B by an expert. **Both parts** must state the
+hash value and name the algorithm used, and SHA256 is one of the algorithms the
+Schedule names on its face.
 
-The app computed exactly that at the moment of capture. So Part A can be
-pre-populated the instant a record is sealed, which is what makes this layer
-nearly free once L4 and L5 exist, and is the part of the system nobody else
-builds.
+The app computed exactly that at the moment of capture, so the machine-knowable
+fields can be pre-populated the instant a record is sealed. That is what makes
+this layer nearly free once L4 and L5 exist, and it is the part of the system
+nobody else builds.
 
 Three rules this module will not bend:
 
 1. **The app never signs for anyone.** Every field a human must attest is emitted
-   empty and marked. An auto-filled signature line is a forgery mechanism.
-2. **Nothing is asserted that the record does not carry.** If a field has no
-   value, it is emitted as absent rather than guessed.
-3. **Unverified statutory labels produce a DRAFT.** The field labels in
-   ``data/bsa63_schedule.json`` are paraphrases until somebody transcribes the
-   Schedule from the bare Act. Until then every certificate says on its face that
-   it must not be filed.
+   blank and marked. An auto-filled signature line is a forgery mechanism, and the
+   Schedule's declarations ("I do hereby solemnly affirm…") are precisely the
+   things no program may assert.
+2. **Nothing is asserted that the record does not carry.** A field the FTR cannot
+   supply is emitted blank and named in :attr:`Certificate.missing_from_record`.
+3. **An unverified Schedule can only produce a DRAFT.** The text in
+   ``data/bsa63_schedule.json`` is transcribed from a bare-Act repository, not
+   from the official Gazette, so every certificate says so on its face.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -35,23 +38,31 @@ __all__ = ["Schedule", "Certificate", "build_certificate", "SCHEDULE_PATH"]
 
 SCHEDULE_PATH = Path(__file__).parent / "data" / "bsa63_schedule.json"
 
-DRAFT_BANNER = [
-    "*** DRAFT — NOT FOR FILING ***",
-    "",
-    "The statutory field labels below are UNVERIFIED PARAPHRASES. They have not",
-    "been transcribed from the bare Act and are very likely wrong in wording, and",
-    "possibly in numbering and part assignment.",
-    "",
-    "Before any certificate is filed, transcribe the Schedule to section 63 from",
-    "the Act itself into ftr/data/bsa63_schedule.json and set verified = true.",
-    "The computed values below (hash, algorithm, device, period) are correct and",
-    "come from the signed record; only the LABELS are provisional.",
-]
+_BANNERS = {
+    "paraphrase": [
+        "*** DRAFT — NOT FOR FILING ***",
+        "",
+        "The statutory field labels below are UNVERIFIED PARAPHRASES. They have not",
+        "been transcribed from any source and are very likely wrong.",
+    ],
+    "secondary": [
+        "*** DRAFT — NOT FOR FILING ***",
+        "",
+        "The field labels below are transcribed from a bare-Act repository, not from",
+        "the official Gazette. They read as faithful, but they have not been checked",
+        "against the authoritative text.",
+        "",
+        "To clear this stamp: compare data/bsa63_schedule.json against the eGazette",
+        "PDF of the Act, then set verification_level to 'official' and verified to",
+        "true. The computed values below are correct either way and come from the",
+        "signed record; only the provenance of the LABELS is provisional.",
+    ],
+}
 
 
 @dataclass(frozen=True)
 class Schedule:
-    """The certificate's field structure, loaded from data."""
+    """The certificate's structure and text, loaded from data."""
 
     raw: dict[str, Any]
 
@@ -64,14 +75,19 @@ class Schedule:
         return bool(self.raw.get("verified"))
 
     @property
+    def verification_level(self) -> str:
+        return self.raw.get("verification_level", "paraphrase")
+
+    @property
     def statute(self) -> str:
         return self.raw.get("statute", "unknown statute")
 
-    def part(self, name: str) -> dict[str, Any]:
-        return self.raw[name]
+    @property
+    def parts(self) -> list[dict[str, Any]]:
+        return self.raw["parts"]
 
-    def fields(self, part: str) -> list[dict[str, str]]:
-        return self.part(part)["fields"]
+    def items(self) -> list[tuple[str, dict[str, Any]]]:
+        return [(p["id"], it) for p in self.parts for it in p["items"]]
 
 
 @dataclass(frozen=True)
@@ -79,45 +95,94 @@ class Certificate:
     """A populated certificate. Never final, never signed, by construction."""
 
     schedule: Schedule
-    values: dict[str, str]              # machine-filled values, by field key
-    blanks: list[str]                   # field keys a human must complete
-    record_digest: str
-    is_draft: bool
+    values: dict[str, Any]
+    blanks: list[str]
+    missing_from_record: list[str] = field(default_factory=list)
+    record_digest: str = ""
+    is_draft: bool = True
 
     @property
     def status(self) -> str:
         return "DRAFT — NOT FOR FILING" if self.is_draft else "READY FOR SIGNATURE"
 
+    # -- rendering ---------------------------------------------------------- #
+
+    def _render_item(self, item: dict[str, Any], out: list[str], width: int) -> None:
+        kind, key = item["kind"], item["key"]
+        value = self.values.get(key)
+
+        if kind == "prose":
+            for line in _wrap(item["text"], width - 2):
+                out.append(f"  {line}")
+            out.append("")
+
+        elif kind == "checkboxes":
+            ticked = value if isinstance(value, str) else None
+            boxes = [f"[{'X' if o == ticked else ' '}] {o}" for o in item["options"]]
+            for line in _wrap("   ".join(boxes), width - 2):
+                out.append(f"  {line}")
+            if item.get("suffix"):
+                out.append(f"  {item['suffix']}")
+            out.append("")
+
+        elif kind == "field":
+            shown = value if value else "______"
+            out.append(f"  {item['label']}: {shown}")
+            if not value:
+                out.append("      ^ blank")
+            out.append("")
+
+        elif kind == "hash":
+            for line in _wrap(item["text"], width - 2):
+                out.append(f"  {line}")
+            if value:
+                out.append("")
+                out.append(f"      {value}")
+            algo = self.values.get(f"{key}__algorithm")
+            boxes = [f"[{'X' if a == algo else ' '}] {a}" for a in item["algorithms"]]
+            out.append(f"      {'  '.join(boxes)}")
+            out.append(f"      {item['note']}")
+            out.append("")
+
+        elif kind == "signature":
+            out.append(f"  {item['label']}")
+            out.append("      ______________________   [ to be signed by hand ]")
+            out.append("")
+
+        elif kind == "datetimeplace":
+            for line in _wrap(item["label"], width - 2):
+                out.append(f"  {line}")
+            out.append("      [ to be completed by hand ]")
+            out.append("")
+
     def text(self, width: int = 78) -> str:
         out: list[str] = []
         if self.is_draft:
-            out += DRAFT_BANNER + ["", "=" * width, ""]
+            out += _BANNERS.get(self.schedule.verification_level, _BANNERS["paraphrase"])
+            out += ["", "=" * width, ""]
 
-        out.append(f"CERTIFICATE UNDER {self.schedule.statute.upper()}")
+        out.append(f"THE SCHEDULE — {self.schedule.raw.get('title', 'CERTIFICATE')}")
+        out.append(self.schedule.raw.get("reference", ""))
+        out.append(f"({self.schedule.statute})")
         out.append("=" * width)
         out.append("")
 
-        for part in ("part_a", "part_b"):
-            meta = self.schedule.part(part)
-            title = part.replace("_", " ").upper()
-            out.append(f"{title} — {meta['signatory_role']}")
+        for part in self.schedule.parts:
+            out.append(f"{part['title']}  {part['subtitle']}")
             out.append("-" * width)
-            for f in self.schedule.fields(part):
-                key, label = f["key"], f["label"]
-                if key in self.values:
-                    value = self.values[key]
-                    out.append(f"  {label}:")
-                    for line in _wrap(value, width - 6):
-                        out.append(f"      {line}")
-                else:
-                    marker = "[ to be completed by hand ]"
-                    out.append(f"  {label}:")
-                    out.append(f"      {marker}")
             out.append("")
+            for item in part["items"]:
+                self._render_item(item, out, width)
 
         out.append("-" * width)
         out.append(f"Status: {self.status}")
-        out.append(f"Fields awaiting a human signatory: {len(self.blanks)}")
+        out.append(f"Fields awaiting a human: {len(self.blanks)}")
+        if self.missing_from_record:
+            out.append("")
+            out.append("Statutory fields the record cannot supply:")
+            for m in self.missing_from_record:
+                out.append(f"  - {m}")
+            out.append("  These must be completed by hand, or the record schema extended.")
         out.append("")
         out.append("This certificate accompanies a PRESUMPTIVE field test. A presumptive")
         out.append("test is a screening indication only. It does not identify a substance")
@@ -138,49 +203,59 @@ def _wrap(s: str, w: int) -> list[str]:
     return out or [""]
 
 
+# --------------------------------------------------------------------------- #
+
 def build_certificate(rec: SealedRecord, schedule: Schedule | None = None) -> Certificate:
-    """Populate Part A from a sealed record. Part B is left entirely to the expert."""
+    """Populate what the record knows. Everything else stays blank and named."""
     schedule = schedule or Schedule.load()
     body = rec.body
-
     device = body.get("device", {})
-    operator = body.get("operator", {})
-    captured = body.get("captured_at", {})
     att = rec.attestation or {}
 
-    device_bits = [
-        f"Android device, verified boot {device.get('verified_boot_state', 'UNKNOWN')}",
+    values: dict[str, Any] = {
+        # The Schedule's own tick-list. A phone is "Mobile".
+        "device_type": "Mobile",
+        # Both parts require the hash and the algorithm. SHA256 is named in the
+        # Schedule itself, which is one reason the record uses it.
+        "hash_value": rec.digest.hex(),
+        "hash_value__algorithm": "SHA256",
+    }
+
+    # Device identity, as far as the record carries it.
+    if device.get("make_model"):
+        values["make_model"] = str(device["make_model"])
+    if device.get("serial_number"):
+        values["serial_number"] = str(device["serial_number"])
+    if device.get("device_identifier"):
+        values["device_identifier"] = str(device["device_identifier"])
+
+    context = [
+        f"Field Test Record {body.get('record_uuid', 'unknown')}",
+        f"sequence {body.get('sequence', '?')} on this device's append-only ledger",
+        f"verified boot {device.get('verified_boot_state', 'UNKNOWN')}",
         f"bootloader {device.get('bootloader_state', 'UNKNOWN')}",
         f"OS patch level {device.get('os_patch_level', 'unknown')}",
         f"signing key security level {att.get('security_level', 'UNKNOWN')}",
     ]
+    values["other_device_information"] = "; ".join(context)
 
-    values: dict[str, str] = {
-        "device_particulars": "; ".join(device_bits),
-        "record_produced": f"Field Test Record {body.get('record_uuid', 'unknown')}, "
-                           f"sequence {body.get('sequence', '?')} on this device's ledger",
-        "hash_value": rec.digest.hex(),
-        "hash_algorithm": "SHA-256 over the canonical CBOR encoding of the record",
+    # Rule 2, made mechanical: statutory fields the record is expected to supply
+    # but cannot. Transcribing the real Schedule is what surfaced these — the FTR
+    # schema was written before anyone had read what the certificate asks for.
+    expected_from_record = {
+        "make_model": "Make & Model of the device",
+        "serial_number": "Serial Number of the device",
+        "device_identifier": "IMEI/UIN/UID/MAC/Cloud ID",
     }
+    missing = [label for key, label in expected_from_record.items() if key not in values]
 
-    if operator.get("id"):
-        values["device_operator"] = str(operator["id"])
-    if captured.get("device_clock"):
-        # One record, one moment. Claiming a "period of regular use" the record does
-        # not evidence would be asserting something the device never observed.
-        values["period_of_use"] = (
-            f"This record was created at {captured['device_clock']} (device clock). "
-            f"The device clock is not independently corroborated; the record's position "
-            f"in the append-only ledger bounds when it was created."
-        )
-
-    blanks = [f["key"] for part in ("part_a", "part_b")
-              for f in schedule.fields(part) if f["key"] not in values]
+    blanks = [it["key"] for _, it in schedule.items() if it["key"] not in values]
 
     return Certificate(
         schedule=schedule,
         values=values,
         blanks=blanks,
+        missing_from_record=missing,
         record_digest=rec.digest.hex(),
         is_draft=not schedule.verified,
     )
