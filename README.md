@@ -29,8 +29,8 @@ Working documents for Smart India Hackathon 2026.
 ## Code
 
 - [`core/`](core/README.md) — `ftr`, the evidentiary core: canonical CBOR, the Field Test Record,
-  the append-only ledger, the colorimetry pipeline, the capture tooling, and the independent
-  verifier. 180 tests.
+  the append-only ledger, the colorimetry pipeline, the capture tooling, the §63 certificate
+  emitter, and the independent verifier. 199 tests.
 - [`dart/ftr_verify/`](dart/ftr_verify/README.md) — the **second** verifier, written independently
   in Dart with no shared code or dependencies. 65 tests, reading vectors the Python side wrote.
 
@@ -39,6 +39,7 @@ python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo   # end-to-end, then four attacks
 .venv/bin/python -m pytest core -q                  # 123 tests
 .venv/bin/python -m ftr.printable --out card.png    # print a reference card
+.venv/bin/ftr-certificate rec.ftr --bundle out/     # §63 certificate + handoff bundle
 
 ./check.sh    # both suites, then asserts the two verifiers reach the same verdict
 ```
@@ -62,7 +63,7 @@ No new hardware. A printed colour card and a phone.
 | A — colour pipeline | **Implemented.** Fiducial detection, homography, illumination correction, patch sampling, quality gate, device transform. Worst error on an accepted frame: 0.76 dE2000 — on synthetic frames only. |
 | B — classification | **Implemented.** Conformal abstention with the finite-sample correction; coverage tested empirically. |
 | D — app | **Designed, not built.** See `docs/DESIGN.md` and the prototype. The in-app verifier (Dart) exists. |
-| E — legal / statutory | Not started. Blocked on transcribing the BSA §63 Schedule from the bare Act. |
+| E — legal / statutory | **Emitter built, statute not yet read.** Certificates render with real computed values and are stamped DRAFT — NOT FOR FILING because the field labels are unverified paraphrases. Remaining work is a transcription into `core/ftr/data/bsa63_schedule.json`. |
 | F — data | **Not started, and it is the critical path.** Card is printable and the ingest tooling is built (`ftr.ingest survey` / `calibrate`, see `docs/CAPTURE.md`); no physical card has been photographed yet. |
 
 Track F cannot be compressed by working harder in the last 48 hours. It is the one to start next.

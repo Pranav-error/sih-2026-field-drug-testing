@@ -19,6 +19,10 @@ dev = ["pytest>=8"]
 ftrverify = "ftr.cli:main"
 ftr-printable = "ftr.printable:main"
 ftr-ingest = "ftr.ingest:main"
+ftr-certificate = "ftr.certcli:main"
+
+[tool.setuptools.package-data]
+ftr = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

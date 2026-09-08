@@ -15,6 +15,8 @@ Layers, as numbered in docs/ARCHITECTURE.md:
         pipeline.measure                one frame in, one measurement out
     L4  record.seal                     canonical CBOR -> SHA-256 -> signature
     L5  chain.Chain                     append-only ledger, anchoring window
+    L6  certificate.build_certificate   BSA 2023 s.63 certificate, Part A populated
+        esakshya.build_envelope         CCTNS-2.0 handoff — not a parallel store
     L7  verifier.verify_record          proven / asserted / unverifiable
 
     ingest.survey / ingest.calibrate    track F: is this capture set usable, and
@@ -27,7 +29,9 @@ can run them with nothing but the standard library.
 
 from .canonical_cbor import CborError, dumps, is_canonical, loads
 from .card import CARD_V1, CardSpec
+from .certificate import Certificate, Schedule, build_certificate
 from .chain import Chain, ChainBreak, ChainStatus
+from .esakshya import build_envelope, write_bundle
 from .colorimetry import (ConformalClassifier, Prediction, RootPolynomial, delta_e_2000,
                           srgb_to_linear, xyz_to_lab)
 from .record import FTR, GENESIS_HASH, SCHEMA_VERSION, SealedRecord, seal
@@ -41,6 +45,8 @@ __all__ = [
     "CARD_V1", "CardSpec",
     "ConformalClassifier", "Prediction", "RootPolynomial",
     "delta_e_2000", "srgb_to_linear", "xyz_to_lab",
+    "Certificate", "Schedule", "build_certificate",
+    "build_envelope", "write_bundle",
     "Chain", "ChainBreak", "ChainStatus",
     "FTR", "SealedRecord", "seal", "GENESIS_HASH", "SCHEMA_VERSION",
     "Attestation", "Keystore", "SoftwareKeystore", "verify_signature",

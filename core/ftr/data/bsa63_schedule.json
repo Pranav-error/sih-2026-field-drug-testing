@@ -1,0 +1,53 @@
+{
+  "_README": [
+    "Field labels for the certificate under Section 63, Bharatiya Sakshya Adhiniyam 2023.",
+    "",
+    "*** THESE LABELS ARE UNVERIFIED PARAPHRASES, NOT STATUTORY TEXT. ***",
+    "",
+    "They were written from secondary descriptions of the Schedule so the emitter",
+    "could be built and tested. They are almost certainly wrong in wording, and may",
+    "be wrong in numbering and in which Part a field belongs to.",
+    "",
+    "To finish this: open the bare Act, transcribe the Schedule verbatim into",
+    "'label' for every field, set 'verified' to true, and fill in 'source' and",
+    "'transcribed_by'. Until then every certificate this emits is stamped DRAFT and",
+    "says on its face that it must not be filed. That stamp is not a formality — a",
+    "certificate with invented statutory labels put before a court is worse than no",
+    "certificate at all.",
+    "",
+    "Owner: track E. See docs/ARCHITECTURE.md section 13, open question 1."
+  ],
+  "verified": false,
+  "source": null,
+  "transcribed_by": null,
+  "statute": "Bharatiya Sakshya Adhiniyam, 2023 — Section 63",
+  "in_force_from": "2024-07-01",
+  "replaced": "Section 65B, Indian Evidence Act 1872",
+
+  "part_a": {
+    "_note": "Completed by the person in charge of the device.",
+    "signatory_role": "Person in charge of the computer or communication device",
+    "fields": [
+      {"key": "device_particulars",   "label": "Particulars of the device", "filled_by": "machine"},
+      {"key": "device_operator",      "label": "Person in lawful control of the device", "filled_by": "machine"},
+      {"key": "period_of_use",        "label": "Period over which the device was regularly used", "filled_by": "machine"},
+      {"key": "record_produced",      "label": "Particulars of the electronic record produced", "filled_by": "machine"},
+      {"key": "hash_value",           "label": "Hash value of the electronic record", "filled_by": "machine"},
+      {"key": "hash_algorithm",       "label": "Algorithm used to obtain the hash value", "filled_by": "machine"},
+      {"key": "lawful_control",       "label": "Statement that the device was in lawful control", "filled_by": "person"},
+      {"key": "signature",            "label": "Signature of the person in charge", "filled_by": "person"},
+      {"key": "date_place",           "label": "Date and place", "filled_by": "person"}
+    ]
+  },
+
+  "part_b": {
+    "_note": "Completed by an expert. The app never populates any of this.",
+    "signatory_role": "Expert",
+    "fields": [
+      {"key": "expert_name",       "label": "Name and designation of the expert", "filled_by": "person"},
+      {"key": "expert_statement",  "label": "Expert statement as to the electronic record", "filled_by": "person"},
+      {"key": "expert_signature",  "label": "Signature of the expert", "filled_by": "person"},
+      {"key": "expert_date_place", "label": "Date and place", "filled_by": "person"}
+    ]
+  }
+}

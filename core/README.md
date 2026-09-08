@@ -17,8 +17,10 @@ ftr/
   record.py           the Field Test Record, sealing, the envelope
   chain.py            append-only device ledger, anchoring window
   signing.py          keystore abstraction + attestation, honest about its level
+  certificate.py      L6: BSA 2023 s.63 certificate, Part A auto-populated
+  esakshya.py         L6: CCTNS-2.0 handoff bundle — not a parallel evidence store
   verifier.py         proven / asserted / unverifiable
-  cli.py              ftrverify
+  cli.py              ftrverify · ftr-printable · ftr-ingest · ftr-certificate
 ```
 
 ## Run it
@@ -26,7 +28,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 180 tests
+.venv/bin/python -m pytest core                        # 199 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -145,13 +147,14 @@ rather than trusting the construction.
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
 | Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
-| BSA §63 certificate emitter | L6 not started; blocked on transcribing the Schedule from the bare Act. |
+| BSA §63 certificate emitter | **Built, and deliberately stamped DRAFT.** The statutory field *labels* are unverified paraphrases; every computed value is real. Track E transcribes the Schedule into `ftr/data/bsa63_schedule.json` and flips one flag. |
+| eSakshya ingest interface | Envelope is well-formed and marked PROVISIONAL. Nobody has yet established whether a documented ingest interface exists (§13 q2). |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
 | Dart implementation | **Done** — `dart/ftr_verify`, including L1's colour transform and L2. It cannot yet find the card in a photograph (ArUco is native), so it reproduces a *measurement* but not yet a *frame*. |
 
 ## Test suite
 
-180 Python tests, plus 65 in Dart. The ones that matter most:
+199 Python tests, plus 65 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.
@@ -162,6 +165,9 @@ rather than trusting the construction.
   and the conformal coverage guarantee measured over 800 trials.
 - `test_cross_implementation.py` — the committed vectors both languages read. If a
   change to either encoder makes these bytes stop matching, the contract is working.
+- `test_certificate.py` — the three rules L6 will not bend: the app never fills a
+  field a human must attest, nothing is asserted that the record does not carry,
+  and an unverified Schedule can only produce a DRAFT.
 - `test_detect.py` — the capture matrix: what the gate accepts must be accurate,
   what would mislead must be rejected, and
   `test_the_printable_card_is_detectable_after_a_camera_round_trip` closes the
