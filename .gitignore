@@ -26,3 +26,7 @@ app/.dart_tool/
 app/.flutter-plugins*
 app/**/local.properties
 app/**/GeneratedPluginRegistrant.*
+
+# Third-party spectral measurements: CC BY-NC-SA 4.0, fetched not vendored.
+# python core/tools/fetch_spectral_data.py
+data/spectral/*.txt

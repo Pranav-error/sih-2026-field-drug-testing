@@ -19,6 +19,17 @@ from ftr.card import PX_PER_MM, CARD_V1, CardSpec
 from ftr.colorimetry import srgb_to_linear
 
 # Illuminants as multiplicative RGB gains, relative to a neutral daylight frame.
+#
+# ⚠ A PER-CHANNEL GAIN CANNOT PRODUCE METAMERISM. Two surfaces that match under
+# one of these "illuminants" match under all of them, because both are scaled
+# identically. Real sensors and real light do not behave that way, and metamerism
+# is the entire reason colour constancy is hard.
+#
+# So every CROSS-ILLUMINANT number measured with this module is measured on an
+# easier problem than reality. Use it for geometry, exposure, focus, glare and
+# noise — the things it models honestly. For anything about colour across
+# illuminants, use ftr/spectral.py, which renders from measured reflectance,
+# measured SPDs and measured camera sensitivities. See docs/ROBUSTNESS.md §6.
 ILLUMINANTS = {
     "daylight":    np.array([1.00, 1.00, 1.00]),
     "shade":       np.array([0.88, 0.95, 1.18]),   # blue cast

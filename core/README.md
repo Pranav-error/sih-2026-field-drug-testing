@@ -13,6 +13,7 @@ ftr/
   colorimetry.py      L1 back half + L2: device transform, CIEDE2000, conformal
   pipeline.py         one frame in, one measurement out — the code the verifier re-runs
   ingest.py           track F: survey a capture set, calibrate on a held-out illuminant
+  spectral.py         physically-based rendering from measured spectra (28 real cameras)
   canonical_cbor.py   deterministic encoding — the digest is the legal artefact
   record.py           the Field Test Record, sealing, the envelope
   chain.py            append-only device ledger, anchoring window
@@ -28,7 +29,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 199 tests
+.venv/bin/python -m pytest core                        # 252 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -145,7 +146,8 @@ rather than trusting the construction.
 | Gap | Status |
 |---|---|
 | Head truncation | Undetectable from files alone. Reported as unverifiable, by design. |
-| Real card, real ink | Everything above is synthetic. No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
+| Real card, real ink | No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
+| Reagent spectra | None exist publicly. Every "reaction" colour in every experiment is a ColorChecker patch standing in for chemistry. See `data/spectral/README.md`. |
 | Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
 | BSA §63 certificate emitter | **Built; Schedule transcribed from a bare-Act repository.** Still stamped DRAFT until someone compares it against the eGazette PDF and flips `verification_level` to `official`. See `docs/CERTIFICATE.md`. |
 | eSakshya ingest interface | Envelope is well-formed and marked PROVISIONAL. Nobody has yet established whether a documented ingest interface exists (§13 q2). |
@@ -154,7 +156,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-199 Python tests, plus 65 in Dart. The ones that matter most:
+252 Python tests, plus 65 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.

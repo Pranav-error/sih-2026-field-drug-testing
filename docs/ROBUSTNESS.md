@@ -212,3 +212,95 @@ python core/tools/make_dataset.py /tmp/ds --per-condition 40
 python core/tools/ablation.py /tmp/ds              # A vs B vs C
 python -m pytest core/tests/test_robustness.py     # 34 tests
 ```
+
+---
+
+## 6. The synthetic camera was measuring an easier problem
+
+Everything in §1–§4 was measured with `tests/synth.py`, which models an illuminant
+as a **per-channel RGB gain**. That has a consequence which invalidates every
+cross-illuminant claim taken from it:
+
+> **A per-channel gain cannot produce metamerism.** Two surfaces the camera records
+> identically under one light are recorded identically under *all* of them, because
+> both are scaled by the same factor.
+
+Metamerism — surfaces that match under one illuminant and diverge under another —
+is the entire reason colour constancy is hard. A simulator without it is testing
+an easier problem than the field.
+
+`core/ftr/spectral.py` fixes this by rendering the way a camera actually works:
+
+```
+R_c = ∫ reflectance(λ) · illuminant(λ) · sensitivity_c(λ) dλ
+```
+
+with all three terms measured rather than invented — see
+[`../data/spectral/README.md`](../data/spectral/README.md) for sources and licence.
+
+### Metamerism is real, and large
+
+Relative RGB separation between two ColorChecker patches, through the Nokia N900
+sensor (the only mobile camera in the database):
+
+| Patch A | Patch B | D65 | A | FL11 | swing |
+|---|---|---|---|---|---|
+| blue | white 9.5 | 6.71 | 9.53 | 8.36 | **2.81** |
+| blue | yellow | 3.88 | 6.02 | 5.25 | **2.14** |
+| purple | white 9.5 | 9.23 | 9.65 | 10.65 | **1.41** |
+
+Under the gain model every one of those swings is exactly **0.00**.
+
+### What the card-in-frame approach actually achieves
+
+Leave-one-patch-out on the chart — fit the transform on 23 patches, predict the
+24th, compare against its true colour under D65. The held-out patch is a surface
+the transform has never seen, which is the situation of the reaction well.
+
+Median ΔE2000 across all 28 cameras:
+
+| D65 | D50 | A | FL2 | FL11 | LED-B3 |
+|---|---|---|---|---|---|
+| **0.50** | 0.66 | **1.24** | 1.01 | 1.17 | 0.63 |
+
+A non-reference illuminant costs about **2.5×**. Two details worth keeping:
+
+- **The mobile sensor is fine.** Nokia N900 scores 0.62 / 0.97 — mid-pack, better
+  than several DSLRs. The approach does not depend on a good camera.
+- **Industrial sensors are worst** (Point Grey, 2.53 dE). Unusual sensitivities are
+  harder to fit with six root-polynomial terms, which is a bound on the method.
+
+### The ablation, redone honestly
+
+8,064 measurements rendered across 28 cameras × 6 illuminants × 4 classes (two
+deliberately close), every arm in the same conformal wrapper:
+
+| Split | A. nearest locus | B. Mahalanobis | C. logistic |
+|---|---|---|---|
+| Held-out **illuminant** | **94.5%** | 91.8% | 94.5% |
+| Held-out **camera** | **95.1%** | 94.8% | 94.8% |
+| Calibrate on DSLRs → deploy on phones | **93.2%** | 92.8% | 92.0% |
+
+**The verdict from §4 survives contact with physics.** Nearest-locus ΔE2000 is best
+or tied-best in every split, and it remains the only one a defence expert can
+recompute on paper. Errors stay at **0.0% in every cell**: under an unseen light or
+an unseen sensor, the system loses coverage by abstaining, never by committing to a
+wrong label.
+
+Two findings that are new, and that only the physical renderer could produce:
+
+1. **Cross-camera generalisation is good** — 95.1%, the only split that meets the
+   95% bound. The card-in-frame normalisation does its job across sensors, which is
+   the thing that makes a kit-agnostic, handset-agnostic deployment plausible.
+2. **Calibrating on the wrong device class costs about 2 points.** Fit on DSLRs,
+   deploy on phones, and coverage falls to 93.2%. The capture matrix's "≥3 device
+   models" should mean three *issued handsets*, not three cameras.
+
+### What is still borrowed
+
+The reaction spectra are ColorChecker patches standing in for reagent
+developments. There is no public spectral library of NDPS presumptive-test colour
+developments and no public dataset of colorimetric drug-test strip images — the
+published smartphone-colorimetry work releases none of its data. The optics are now
+honest; the chemistry is still borrowed, and the submission should say so before
+anyone asks.
