@@ -1,11 +1,12 @@
 # Field Companion — the app
 
 Flutter client for SIH26231. Implements the capture spine from
-[`../docs/DESIGN.md`](../docs/DESIGN.md): standby → capture → result → sealed.
+[`../docs/DESIGN.md`](../docs/DESIGN.md): standby → capture → **second view** →
+result → sealed.
 
 ```sh
 flutter pub get
-flutter test        # 21 tests, each asserting a rule from DESIGN.md
+flutter test        # 33 tests, each asserting a rule from DESIGN.md
 flutter run
 ```
 
@@ -16,7 +17,8 @@ flutter run
 | **Sealing** | Real. Goes through `ftr_verify`, the same package the reference verifier reads. Records this app produces verify in Python. |
 | **Canonical CBOR, hash chain, envelope** | Real, shared — the app does **not** carry its own copy. |
 | Screens, gating, guidance copy | Real, and tested. |
-| Camera | **Not implemented.** A button stands in for the frame settling. |
+| Camera | **Not implemented.** Buttons stand in for the frame settling and for moving between the two views. |
+| Two-view liveness | Screen and gating are real and tested; the parallax measurement itself is not wired (it needs the native L1 path). The record carries the liveness block. |
 | L1 colour pipeline | **Not wired.** Card detection needs OpenCV over a platform channel; the Dart colour maths is in `ftr_verify`. |
 | StrongBox keystore | **Not implemented.** Development builds sign with a software key. |
 | Archivo / IBM Plex Mono | **Not bundled.** Flutter falls back silently on an unknown family, so each is paired with a real fallback stack — `monospace` first for the mono face. Bundle the real faces before the finale; the fallback keeps the *rule* true, not the look. |
@@ -69,6 +71,11 @@ free to change, these are not:
   not prove wall-clock time.
 - **Touch targets are ≥ 48dp and state is never colour-only.** Gloves, sunlight,
   and an issued handset.
+- **Absent is never shown as passed.** A liveness check that did not run reads
+  `NOT RUN` where a result would be, because silence would read as a pass.
+- **The second view is gated on having actually moved**, and its guidance never
+  mentions parallax, baselines or millimetres — the operator can act on "move a
+  little further", not on stereo geometry.
 
 ## Next
 
@@ -76,6 +83,8 @@ free to change, these are not:
 2. `StrongBoxKeystore` over a platform channel — `KeyGenParameterSpec.Builder`
    with `setIsStrongBoxBacked(true)` and `setAttestationChallenge(digest)`, with an
    explicit TEE fallback whose weaker guarantee is recorded rather than glossed.
-3. On-device chain storage and the record log screen.
+3. Wire the parallax measurement to the native L1 path so the second view does
+   real work rather than being gated on a simulated baseline.
+4. On-device chain storage and the record log screen.
 4. The remaining screens from `DESIGN.md`: setup, quality gate, log, certificate,
    verifier report.

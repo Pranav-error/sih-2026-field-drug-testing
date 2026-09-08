@@ -39,7 +39,7 @@ class FieldCompanionApp extends StatelessWidget {
   }
 }
 
-enum Step { standby, capture, result, sealed }
+enum Step { standby, capture, secondView, result, sealed }
 
 class CaptureFlow extends StatefulWidget {
   const CaptureFlow({super.key});
@@ -62,6 +62,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
   // Stands in for the live camera. The real overlay is fed by the native L1
   // pipeline over a platform channel; the widget only ever renders what it is given.
   double _progress = 0;
+  double _baselineMm = 0;
 
   CaptureQuality get _quality => CaptureQuality(
         fiducialsFound: (_progress * 4).clamp(0, 4).round(),
@@ -82,6 +83,15 @@ class _CaptureFlowState extends State<CaptureFlow> {
         sinceAnchor: Duration(minutes: 4 * _sequence),
       );
 
+  SecondView get _secondView =>
+      SecondView(baselineMm: _baselineMm, cardVisible: true);
+
+  // A live capture. The flat case is what a print produces, and the app treats it
+  // as a refusal rather than an error — see docs/PARALLAX.md.
+  static const _liveness = Liveness(
+    checked: true, live: true, measuredPx: 28.1, predictedPx: 28.2,
+  );
+
   static const _result = TestResult(
     predictionSet: ['opiate_class', 'amphetamine_class'],
     label: null,
@@ -101,7 +111,12 @@ class _CaptureFlowState extends State<CaptureFlow> {
       operator_: {'id': 'NCB/BLR/2291', 'biometric_unlock_used': true},
       kit: {'reagent_type': 'marquis'},
       card: {'card_id': 'CARD-IN-2026-0417', 'print_batch': 'B12'},
-      capture: {'raw_image_sha256': ftr.sha256(frame)},
+      capture: {
+        'raw_image_sha256': ftr.sha256(frame),
+        // The second view is evidence too, and is bound like the first.
+        'second_frame_sha256': ftr.sha256(
+            Uint8List.fromList('frame $_sequence view B'.codeUnits)),
+      },
       colorimetry: {
         'measured': true,
         'lab_x100': _result.lab!.map((v) => (v * 100).round()).toList(),
@@ -111,6 +126,15 @@ class _CaptureFlowState extends State<CaptureFlow> {
         'alpha_x1000': (_result.alpha * 1000).round(),
         'prediction_set': _result.predictionSet,
         'label': _result.label,
+      },
+      liveness: {
+        'checked': _liveness.checked,
+        'live': _liveness.live,
+        'displacement_px_x100': (_liveness.measuredPx * 100).round(),
+        'predicted_px_x100': (_liveness.predictedPx * 100).round(),
+        'tab_height_mm_x10': 80,
+        'baseline_mm_x10': 500,
+        'distance_mm_x10': 1500,
       },
       locationBundle: const {'corroboration_channels_agreeing': 4,
         'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
@@ -141,7 +165,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return Stack(children: [
           CaptureScreen(
             quality: _quality,
-            onCapture: () => setState(() => _step = Step.result),
+            onCapture: () => setState(() {
+              _baselineMm = 0;
+              _step = Step.secondView;
+            }),
           ),
           // Stands in for the camera settling. Removed with the platform channel.
           Positioned(
@@ -154,8 +181,24 @@ class _CaptureFlowState extends State<CaptureFlow> {
             ),
           ),
         ]);
+      case Step.secondView:
+        return Stack(children: [
+          SecondViewScreen(
+            view: _secondView,
+            onCapture: () => setState(() => _step = Step.result),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 96,
+            child: FloatingActionButton.small(
+              tooltip: 'Simulate moving the phone',
+              onPressed: () => setState(() => _baselineMm += 4.5),
+              child: const Icon(Icons.swipe_right),
+            ),
+          ),
+        ]);
       case Step.result:
-        return ResultScreen(result: _result, onSeal: _seal);
+        return ResultScreen(result: _result, liveness: _liveness, onSeal: _seal);
       case Step.sealed:
         return Scaffold(
           body: SealedScreen(

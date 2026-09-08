@@ -136,15 +136,96 @@ class CaptureScreen extends StatelessWidget {
   }
 }
 
+/// Screen 03b — the second view.
+///
+/// The screen most likely to be cut by someone who does not know why it exists.
+/// A quality print passes every colour check; what it cannot fake is depth. This
+/// asks the operator to move a few centimetres, without explaining stereo
+/// geometry to somebody standing in the sun wearing gloves.
+class SecondViewScreen extends StatelessWidget {
+  const SecondViewScreen({super.key, required this.view, this.onCapture});
+
+  final SecondView view;
+  final VoidCallback? onCapture;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Scaffold(
+      title: 'Second view',
+      chip: StateChip(view.ready ? 'Far enough' : 'Keep moving',
+          colour: view.ready ? Tokens.negative : Tokens.abstain,
+          soft: view.ready ? Tokens.negativeSoft : Tokens.abstainSoft),
+      body: [
+        AspectRatio(
+          aspectRatio: 3 / 4,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF16131F),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            alignment: Alignment.bottomLeft,
+            padding: const EdgeInsets.all(10),
+            child: Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(view.guidance,
+                  style: const TextStyle(color: Color(0xFFEDEAF4), fontSize: 12.5)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Panel(title: 'Movement', children: [
+          // Deliberately not a number in millimetres: the operator cannot act on
+          // "24 mm", only on "far enough".
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: view.progress,
+              minHeight: 5,
+              backgroundColor: Tokens.ruleSoft,
+              valueColor: AlwaysStoppedAnimation(
+                  view.ready ? Tokens.negative : Tokens.abstain),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Measured('Card in frame', view.cardVisible ? 'Yes' : 'No',
+              tone: view.cardVisible ? Tokens.negative : Tokens.abstain),
+          Measured('Moved far enough', view.ready ? 'Yes' : 'Not yet',
+              tone: view.ready ? Tokens.negative : Tokens.abstain),
+        ]),
+        const PresumptiveNotice(
+          detail: 'Two views from slightly different positions prove the card was '
+              'physically present. A photograph of a card is flat, and cannot '
+              'produce this — at any print quality.',
+        ),
+      ],
+      footer: [
+        PrimaryButton(view.ready ? 'Capture second frame' : 'Move a little further',
+            onPressed: view.ready ? onCapture : null),
+        const SizedBox(height: 8),
+        const Text('Both frames are hashed into the record. The second one is '
+            'evidence too.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted)),
+      ],
+    );
+  }
+}
+
 /// Screen 05 — a prediction set, not a percentage.
 ///
 /// An abstention is rendered with the same weight as a call, never as an error
 /// or a prompt to retry until the answer improves.
 class ResultScreen extends StatelessWidget {
-  const ResultScreen({super.key, required this.result, this.onSeal});
+  const ResultScreen({super.key, required this.result, this.onSeal,
+      this.liveness = const Liveness.notChecked()});
 
   final TestResult result;
   final VoidCallback? onSeal;
+  final Liveness liveness;
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +274,26 @@ class ResultScreen extends StatelessWidget {
           for (final e in result.scores.entries)
             Measured('  ΔE to ${e.key}', e.value.toStringAsFixed(2),
                 tone: e.value <= result.threshold ? Tokens.ink : Tokens.muted),
+        ]),
+        Panel(title: 'Liveness', tint: true, children: [
+          if (!liveness.checked)
+            Measured('Two-view check', 'NOT RUN', tone: Tokens.abstain)
+          else ...[
+            Measured('Parallax measured', '${liveness.measuredPx.toStringAsFixed(1)} px',
+                limit: '${liveness.predictedPx.toStringAsFixed(1)} px predicted',
+                tone: liveness.live ? Tokens.negative : Tokens.positive),
+            Measured('Physically present', liveness.live ? 'Yes' : 'NO — scene was flat',
+                tone: liveness.live ? Tokens.negative : Tokens.positive),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            liveness.checked
+                ? (liveness.live
+                    ? 'The scene had depth. A print or a screen gives zero parallax.'
+                    : liveness.reason)
+                : liveness.reason,
+            style: const TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
+          ),
         ]),
         const PresumptiveNotice(),
       ],

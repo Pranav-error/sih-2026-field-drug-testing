@@ -48,6 +48,60 @@ class CaptureQuality {
   }
 }
 
+/// Progress toward the second view.
+///
+/// The operator is never shown a baseline in millimetres. They are shown whether
+/// they have moved far enough, because that is the only part they can act on.
+class SecondView {
+  final double baselineMm;      // estimated from the card's apparent motion
+  final bool cardVisible;
+
+  const SecondView({required this.baselineMm, required this.cardVisible});
+
+  /// Ten millimetres is enough for an 8 mm tab at arm's length. The screen must
+  /// not imply precision it does not need.
+  static const double enoughMm = 10.0;
+
+  bool get ready => cardVisible && baselineMm >= enoughMm;
+
+  double get progress => (baselineMm / enoughMm).clamp(0.0, 1.0);
+
+  String get guidance {
+    if (!cardVisible) return 'Keep the whole card in frame.';
+    if (baselineMm < enoughMm * 0.4) return 'Move a little to the right and shoot again.';
+    if (!ready) return 'Keep going — a few more centimetres.';
+    return 'Far enough. Capture the second frame.';
+  }
+}
+
+/// The two-view liveness check: what was measured, and what the geometry required.
+///
+/// Both numbers are carried together on purpose. A reader shown only a verdict
+/// cannot check it; a reader shown 28.1 against 28.2 can.
+class Liveness {
+  final bool checked;
+  final bool live;
+  final double measuredPx;
+  final double predictedPx;
+  final String reason;
+
+  const Liveness({
+    required this.checked,
+    required this.live,
+    required this.measuredPx,
+    required this.predictedPx,
+    this.reason = '',
+  });
+
+  const Liveness.notChecked()
+      : checked = false,
+        live = false,
+        measuredPx = 0,
+        predictedPx = 0,
+        reason = 'single frame — this capture cannot be distinguished from a '
+            'photograph of a card';
+}
+
 /// A completed measurement, or a refusal with its reasons.
 class TestResult {
   final List<String> predictionSet;

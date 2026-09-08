@@ -35,6 +35,7 @@ two get the *complete record* — never the reverse.
 | 5 | **Blank human fields stay blank,** marked ▢ in amber. | An auto-filled signature line is a forgery mechanism. |
 | 6 | **Every gate can be overridden, and the override is recorded.** | Field conditions are not negotiable with software; but the protest becomes part of the signed record. |
 | 7 | **Colour is never load-bearing alone.** Every stripe, chip and state is doubled by a text label. | Accessibility, sunlight, and cheap issued handsets with poor screens. |
+| 8 | **Absent is never shown as passed.** A check that did not run says so, in the same place a result would appear. | A single-frame record cannot be told from a photograph of a card. Silence would read as a pass. |
 
 ---
 
@@ -76,6 +77,7 @@ keeps the app feeling like an instrument and the exports feeling like documents.
 | 01 | **Standby** | Device states its own trustworthiness before use | Begin field test |
 | 02 | **New test** | Reagent, reference card, case linkage — all kit-agnostic | Open camera |
 | 03 | **Capture** | Guidance overlay + live quality meters; shutter gated | Capture frame |
+| 03b | **Second view** | Move slightly and capture again — this is what refuses a photograph | Capture second frame |
 | 04 | **Frame accepted** | Normalisation report + location corroboration, *before* any result | Read result |
 | 05 | **Result** | Prediction set, ΔE basis, α — with an abstention variant | Seal record |
 | 06 | **Record sealed** | Digest, signature, attestation, chain position, anchor window | Generate certificate |
@@ -122,6 +124,36 @@ wrong answer in exactly the conditions where that does the most damage.
 **Binds:** `capture.raw_image_sha256`, `colorimetry.blur_metric`, `colorimetry.dynamic_range`,
 `card.fiducial_lock`
 
+### 03b Second view
+
+**The single most counter-intuitive screen in the app, and the one most likely to be
+cut by someone who does not know why it is there.**
+
+A quality print or a high-DPI screen passes every colorimetric check reading as an
+*excellent* capture ([`ROBUSTNESS.md`](ROBUSTNESS.md) §3). What a reproduction cannot
+fake is depth. So capture is **two frames**, from slightly different positions, and the
+card's folded liveness tab must show the parallax the geometry predicts
+([`PARALLAX.md`](PARALLAX.md)).
+
+The interaction has one job: get the operator to move a few centimetres without
+explaining stereo geometry to them.
+
+- The prompt is an instruction, not a rationale: **"Move a little to the right and
+  shoot again."** Ten millimetres is enough; there is no need to be precise, and the
+  screen must not imply there is.
+- A live indicator shows the estimated baseline so far, and arms the shutter once it
+  is sufficient. The operator sees *"far enough"*, not a number in millimetres.
+- **Both frames are hashed into the record.** The second frame is evidence too.
+- If the second frame does not show the card, that is a refusal with its own reason —
+  not a silent fall back to a single-frame record.
+- The result of the check is shown on screen 04 alongside the other gates, in the same
+  visual weight. Liveness is not a security feature bolted on; it is a measurement with
+  a predicted value and a measured one.
+
+**A flat capture is a refusal, not an error.** The record is still sealed — deleting it
+is the attack the ledger exists to stop — and it carries no result plus the reason it
+has none. Identical to how a failed quality gate behaves, and for the same reason.
+
 ### 04 Frame accepted
 Both gates report **before the result is revealed**. Order matters: an operator who has already seen
 "positive" will rationalise a poor calibration score.
@@ -133,7 +165,11 @@ Corrective steps (shadow removal) are disclosed on screen — correction is not 
 Retake is offered at equal visual weight. No dark pattern pushes toward proceeding.
 
 **Binds:** `colorimetry.calibration_residual`, `location_bundle.*`, `corroboration_score`,
-`spoof_indicators[]`
+`spoof_indicators[]`, `liveness.*`
+
+The liveness panel shows the measurement and what the geometry required side by side —
+`28.1 px measured / 28.2 px predicted` — because a reader who can see both can check
+the claim, and a reader shown only a green tick cannot.
 
 ### 05 Result — two designed states, no error state
 ```
@@ -214,6 +250,7 @@ Three sections, equal visual weight, none collapsed behind a disclosure triangle
 ## 5. What the prototype does not yet cover
 
 1. Onboarding and device enrolment (key generation, card registration).
+0. The second-view screen (03b) is specified above but not built.
 2. Multi-sample sessions — several strips from one seizure under one memo.
 3. Anchor-reconnect flow and its conflict states.
 4. Withdrawal/annotation UI for record 07.

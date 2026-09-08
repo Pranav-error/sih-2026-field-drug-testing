@@ -147,6 +147,7 @@ Map<String, Object?> buildBody({
   required Map<String, Object?> capture,
   required Map<String, Object?> colorimetry,
   required Map<String, Object?> classification,
+  Map<String, Object?> liveness = const {'checked': false},
   required Map<String, Object?> locationBundle,
   required Map<String, Object?> device,
   Map<String, Object?> ndps = const {},
@@ -167,6 +168,9 @@ Map<String, Object?> buildBody({
     'card': card,
     'capture': capture,
     'colorimetry': colorimetry,
+    // Peer of colorimetry and classification: whether the scene was physically
+    // present is a finding about the test, not a property of an image file.
+    'liveness': liveness,
     'classification': classification,
     'location_bundle': locationBundle,
     'device': device,

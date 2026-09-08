@@ -231,6 +231,7 @@ void main() {
   });
 
   _fontRules();
+  _livenessRules();
 
   group('accessibility', () {
     testWidgets('primary actions meet the touch target minimum', (t) async {
@@ -279,6 +280,101 @@ void _fontRules() {
       final w = t.widget<SelectableText>(find.byType(SelectableText));
       expect(w.style!.fontFamily, Tokens.mono);
       expect(w.style!.fontFamilyFallback, Tokens.monoFallback);
+    });
+  });
+}
+
+
+/// The two-frame capture, and rule 8: absent is never shown as passed.
+///
+/// The second-view screen is the one most likely to be cut by someone who does
+/// not know why it exists. A quality print passes every colour check; what it
+/// cannot fake is depth. See docs/PARALLAX.md.
+void _livenessRules() {
+  group('rule 8 — absent is never shown as passed', () {
+    testWidgets('a record with no liveness check says NOT RUN, in the same place '
+        'a result would appear', (t) async {
+      await t.pumpWidget(wrap(ResultScreen(
+        result: result(['opiate_class'], label: 'opiate_class'),
+        liveness: const Liveness.notChecked(),
+      )));
+      expect(find.text('NOT RUN'), findsOneWidget);
+      expect(find.textContaining('photograph of a card'), findsOneWidget);
+    });
+
+    testWidgets('a live capture shows the measurement AND what was predicted',
+        (t) async {
+      await t.pumpWidget(wrap(ResultScreen(
+        result: result(['opiate_class'], label: 'opiate_class'),
+        liveness: const Liveness(
+            checked: true, live: true, measuredPx: 28.1, predictedPx: 28.2),
+      )));
+      // A reader shown only a verdict cannot check it; shown both, they can.
+      expect(find.textContaining('28.1 px'), findsOneWidget);
+      expect(find.textContaining('28.2 px predicted'), findsOneWidget);
+    });
+
+    testWidgets('a flat capture says the scene was flat, not "error"', (t) async {
+      await t.pumpWidget(wrap(ResultScreen(
+        result: result(const []),
+        liveness: const Liveness(
+            checked: true, live: false, measuredPx: 0.1, predictedPx: 28.2,
+            reason: 'FLAT. A print or a screen gives zero, because it is flat.'),
+      )));
+      expect(find.textContaining('scene was flat'), findsOneWidget);
+      expect(find.textContaining('Error'), findsNothing);
+      expect(find.textContaining('Failed'), findsNothing);
+    });
+  });
+
+  group('the second view is gated on having actually moved', () {
+    const notYet = SecondView(baselineMm: 2.0, cardVisible: true);
+    const far = SecondView(baselineMm: 14.0, cardVisible: true);
+    const lost = SecondView(baselineMm: 30.0, cardVisible: false);
+
+    testWidgets('the shutter is blocked until the operator has moved enough',
+        (t) async {
+      var fired = false;
+      await t.pumpWidget(wrap(
+          SecondViewScreen(view: notYet, onCapture: () => fired = true)));
+      await t.tap(find.byType(PrimaryButton));
+      expect(fired, isFalse);
+      expect(find.text('Move a little further'), findsOneWidget);
+    });
+
+    testWidgets('a sufficient movement arms it', (t) async {
+      var fired = false;
+      await t.pumpWidget(
+          wrap(SecondViewScreen(view: far, onCapture: () => fired = true)));
+      await t.tap(find.text('Capture second frame'));
+      expect(fired, isTrue);
+    });
+
+    test('losing the card blocks the capture whatever the baseline', () {
+      expect(lost.ready, isFalse);
+      expect(lost.guidance, contains('whole card in frame'));
+    });
+
+    test('guidance tells the operator what to do, never the geometry', () {
+      expect(notYet.guidance, contains('Move'));
+      expect(far.guidance, contains('Far enough'));
+      // No stereo baselines, no millimetres, no parallax lecture.
+      for (final g in [notYet.guidance, far.guidance, lost.guidance]) {
+        expect(g.toLowerCase(), isNot(contains('parallax')));
+        expect(g.toLowerCase(), isNot(contains('baseline')));
+        expect(g, isNot(contains('mm')));
+      }
+    });
+
+    testWidgets('the screen says why the second frame exists, once', (t) async {
+      await t.pumpWidget(wrap(const SecondViewScreen(view: far)));
+      expect(find.textContaining('physically present'), findsOneWidget);
+      expect(find.textContaining('evidence too'), findsOneWidget);
+    });
+
+    test('ten millimetres is enough — the screen must not imply precision', () {
+      expect(SecondView.enoughMm, 10.0);
+      expect(const SecondView(baselineMm: 10.0, cardVisible: true).ready, isTrue);
     });
   });
 }
