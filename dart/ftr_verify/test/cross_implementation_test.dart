@@ -15,6 +15,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:ftr_verify/src/canonical_cbor.dart' as cbor;
 import 'package:ftr_verify/src/record.dart';
+import 'package:ftr_verify/src/seal.dart' show SoftwareKeystore, toEnvelope, seal;
 import 'package:ftr_verify/src/verifier.dart';
 import 'package:test/test.dart';
 
@@ -113,6 +114,58 @@ void main() {
       final report = verifyRecord(f.readAsBytesSync());
       expect(report.ok, isFalse);
       expect(report.failures.any((x) => x.contains('does not verify')), isTrue);
+    });
+  });
+
+  group('liveness — both implementations must read it the same way', () {
+    Uint8List sealWith(Map<String, Object?> liveness) {
+      final body = <String, Object?>{
+        'schema_version': 1,
+        'record_uuid': '00000000-0000-4000-c000-000000000001',
+        'sequence': 0,
+        'prev_record_hash': genesisHash,
+        'captured_at': {'device_clock': '2026-09-13T16:00:00+05:30'},
+        'operator': {'id': 'NCB/BLR/2291'},
+        'kit': {'reagent_type': 'marquis'},
+        'card': {'card_id': 'CARD-IN-2026-0417'},
+        'capture': <String, Object?>{},
+        'colorimetry': {'measured': true, 'gate_passed': true},
+        'liveness': liveness,
+        'classification': {'label': 'opiate_class', 'prediction_set': ['opiate_class']},
+        'location_bundle': <String, Object?>{},
+        'device': <String, Object?>{},
+        'ndps': <String, Object?>{},
+        'omitted': <String>[],
+      };
+      return toEnvelope(seal(body, SoftwareKeystore(seed: 3)));
+    }
+
+    test('a flat capture FAILS, and separates record integrity from content', () {
+      final report = verifyRecord(sealWith({
+        'checked': true, 'live': false,
+        'displacement_px_x100': 10, 'predicted_px_x100': 2820,
+        'tab_height_mm_x10': 80, 'baseline_mm_x10': 500,
+      }));
+      expect(report.ok, isFalse);
+      expect(report.failures.any((f) => f.contains('LIVENESS FAILED')), isTrue);
+      expect(report.failures.any((f) => f.contains('record is authentic')), isTrue,
+          reason: 'an authentic record of a photograph is not an altered record');
+    });
+
+    test('a live capture is asserted, not proven — Dart cannot re-derive it', () {
+      final report = verifyRecord(sealWith({
+        'checked': true, 'live': true,
+        'displacement_px_x100': 2810, 'predicted_px_x100': 2820,
+        'tab_height_mm_x10': 80, 'baseline_mm_x10': 500,
+      }));
+      expect(report.asserted.any((a) => a.contains('parallax')), isTrue);
+      expect(report.failures.where((f) => f.contains('LIVENESS')), isEmpty);
+    });
+
+    test('an unchecked capture is flagged, not silently accepted', () {
+      final report = verifyRecord(sealWith({'checked': false}));
+      expect(report.asserted.any((a) => a.contains('single frame')), isTrue);
+      expect(report.unverifiable.any((u) => u.contains('physically present')), isTrue);
     });
   });
 }

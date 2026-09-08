@@ -30,7 +30,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 271 tests
+.venv/bin/python -m pytest core                        # 278 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -158,7 +158,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-271 Python tests, plus 65 in Dart. The ones that matter most:
+278 Python tests, plus 68 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.

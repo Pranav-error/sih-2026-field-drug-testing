@@ -27,10 +27,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "tests"))
 
 from factory import SimulatedHardwareKeystore          # noqa: E402  (demo-only hardware stub)
 from synth import photograph, render_card               # noqa: E402  (demo-only camera)
+from synth3d import replay_pair, stereo_pair, tab_texture  # noqa: E402  (two-view rig)
 from ftr.canonical_cbor import dumps                    # noqa: E402
 from ftr.chain import Chain                             # noqa: E402
 from ftr.colorimetry import ConformalClassifier, srgb_to_linear, xyz_to_lab  # noqa: E402
-from ftr.pipeline import SRGB_TO_XYZ_D65, measure       # noqa: E402
+from ftr.card import CARD_V1                            # noqa: E402
+from ftr.pipeline import SRGB_TO_XYZ_D65, measure, measure_pair  # noqa: E402
 from ftr.record import FTR, SealedRecord, seal          # noqa: E402
 from ftr.verifier import verify_chain, verify_record    # noqa: E402
 
@@ -88,6 +90,7 @@ def make_record(m, frame_bytes: bytes, agreeing: int = 4, indicators=()) -> FTR:
         capture={"raw_image_sha256": hashlib.sha256(frame_bytes).digest(),
                  "normalised_image_sha256": hashlib.sha256(frame_bytes + b"|norm").digest()},
         colorimetry=fields["colorimetry"],
+        liveness=fields["liveness"],
         classification=fields.get("classification", {"measured": False}),
         location_bundle={"lat_x1e7": 129912000, "lon_x1e7": 777205000, "accuracy_m": 6,
                          "gnss_raw_digest": hashlib.sha256(b"gnss").digest(),
@@ -168,6 +171,22 @@ def main() -> int:
     print("  note: the refusal was sealed and chained exactly like the two results.")
     print("        A frame the instrument would not read is evidence too, and deleting")
     print("        it is the attack the ledger exists to stop.")
+
+    rule("Adversary §10 row 1 — photograph a print of the whole scene")
+    raised = (tab_texture(), CARD_V1.tab_height_mm, np.array(CARD_V1.tab_quad_mm))
+    honest = stereo_pair(render_card(well_srgb=WELLS["opiate_class"]), raised=raised)
+    forged = replay_pair(render_card(well_srgb=WELLS["opiate_class"]),
+                         medium="print", raised=raised)
+    for label, (fa, fb) in [("physical card", honest), ("photo-lab print of it", forged)]:
+        m = measure_pair(fa, fb, clf)
+        lv = m.record_fields()["liveness"]
+        got, want = lv["displacement_px_x100"] / 100, lv["predicted_px_x100"] / 100
+        print(f"  {label:<24} parallax {got:5.1f} px   predicted {want:5.1f} px   "
+              f"{'LIVE' if lv['live'] else 'REFUSED'}")
+        if not lv["live"]:
+            print(f"  {'':<24} {m.refusals[-1][:86]}")
+    print("  A quality print passes every colour check — it is flat, and flatness is")
+    print("  not an artefact better equipment removes. It is the medium.")
 
     rule("Independent verifier — the honest chain")
     print(verify_chain(chain.root).text())

@@ -159,3 +159,102 @@ def test_a_synchronised_stereo_replay_still_defeats_this(card):
         "a synchronised stereo replay is indistinguishable from the real capture "
         "by this check alone — if that ever stops being true, invert this test"
     )
+
+
+# --- the defence has to reach the record ----------------------------------- #
+
+class TestLivenessReachesTheEvidence:
+    """A defence the verifier cannot see is not evidence.
+
+    The whole thesis of this project is that the record is the product. Parallax
+    that lives only in the app is a demo; parallax bound into the sealed record and
+    reported by an independent verifier is a finding.
+    """
+
+    def _pipe(self, card, **kw):
+        from ftr.card import CARD_V1
+        from ftr.pipeline import measure_pair
+        raised = (tab_texture(), CARD_V1.tab_height_mm, np.array(CARD_V1.tab_quad_mm))
+        if kw.pop("replay", None):
+            a, b = replay_pair(card, baseline_mm=BASE, distance_mm=DIST,
+                               medium=kw.pop("medium", "print"), raised=raised)
+        else:
+            a, b = stereo_pair(card, baseline_mm=BASE, distance_mm=DIST, raised=raised)
+        return measure_pair(a, b, baseline_mm=BASE, distance_mm=DIST)
+
+    def test_a_live_capture_records_its_geometry(self, card):
+        m = self._pipe(card)
+        live = m.record_fields()["liveness"]
+        assert live["checked"] is True and live["live"] is True
+        # everything a reader needs to check the arithmetic themselves
+        for k in ("displacement_px_x100", "predicted_px_x100", "tab_height_mm_x10",
+                  "baseline_mm_x10", "distance_mm_x10", "confidence_x1000"):
+            assert k in live, f"{k} missing — the claim would not be re-checkable"
+
+    def test_a_flat_capture_becomes_a_refusal_and_is_still_sealed(self, card):
+        """Consistent with every other gate: refuse the result, keep the record.
+        Deleting it is the attack the ledger exists to stop."""
+        m = self._pipe(card, replay=True)
+        assert m.record_fields()["liveness"]["live"] is False
+        assert not m.usable, "a flat capture must not yield a result"
+        assert any("FLAT" in x for x in m.refusals)
+
+    def test_a_single_frame_record_says_so_rather_than_staying_silent(self, card):
+        """Absent is not the same as passed."""
+        from ftr.pipeline import measure
+        a, _ = stereo_pair(card, baseline_mm=BASE, distance_mm=DIST,
+                           raised=(tab_texture(), 8.0, np.array([[21.0, 66.0], [40.0, 66.0],
+                                                                [40.0, 80.0], [21.0, 80.0]])))
+        live = measure(a).record_fields()["liveness"]
+        assert live["checked"] is False
+        assert "photograph of a card" in live["note"]
+
+    def test_the_liveness_block_survives_canonical_encoding(self, card):
+        """Canonical CBOR refuses floats. Catch a stray one here, not at sealing."""
+        from ftr.canonical_cbor import dumps
+        dumps(self._pipe(card).record_fields())
+
+    def _seal(self, tmp_path, measurement, name):
+        import hashlib
+        from factory import SimulatedHardwareKeystore, sample_ftr
+        from ftr.chain import Chain
+        from ftr.record import seal
+        f = sample_ftr()
+        fields = measurement.record_fields()
+        f.colorimetry = fields["colorimetry"]
+        f.liveness = fields["liveness"]
+        chain = Chain(tmp_path / name)
+        rec = seal(f, chain.head(), 0, SimulatedHardwareKeystore(tmp_path / f"{name}.pem"))
+        chain.append(rec)
+        return rec
+
+    def test_the_verifier_reports_a_live_capture_as_asserted(self, card, tmp_path):
+        """The app measured it; this verifier did not. That is asserted, not proven."""
+        from ftr.verifier import verify_record
+        rec = self._seal(tmp_path, self._pipe(card), "live")
+        report = verify_record(rec.to_envelope())
+        assert report.ok
+        assert any("parallax" in a and "asserted" in a for a in report.asserted)
+
+    def test_the_verifier_FAILS_a_flat_capture(self, card, tmp_path):
+        """A record of a photograph of a strip must not read as VERIFIED."""
+        from ftr.verifier import verify_record
+        rec = self._seal(tmp_path, self._pipe(card, replay=True), "flat")
+        report = verify_record(rec.to_envelope())
+        assert not report.ok
+        assert any("LIVENESS FAILED" in f for f in report.failures)
+        assert any("record is authentic" in f for f in report.failures), (
+            "must separate the record's integrity from what it photographed"
+        )
+
+    def test_the_verifier_flags_a_record_with_no_liveness_check(self, card, tmp_path):
+        from ftr.pipeline import measure
+        from ftr.verifier import verify_record
+        a, _ = stereo_pair(card, baseline_mm=BASE, distance_mm=DIST,
+                           raised=(tab_texture(), 8.0, TAB_QUAD))
+        rec = self._seal(tmp_path, measure(a), "single")
+        report = verify_record(rec.to_envelope())
+        assert report.ok, "a single-frame record is authentic, just weaker"
+        assert any("cannot be distinguished from a photograph" in x
+                   for x in report.asserted)
+        assert any("physically present" in u for u in report.unverifiable)

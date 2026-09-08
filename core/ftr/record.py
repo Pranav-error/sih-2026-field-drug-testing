@@ -51,6 +51,10 @@ class FTR:
     location_bundle: dict[str, Any]
     device: dict[str, Any]
     captured_at: dict[str, Any]
+    # Peer of colorimetry and classification, not a sub-field of capture: whether
+    # the scene was physically present is a finding about the test, not a property
+    # of the image file. See docs/PARALLAX.md.
+    liveness: dict[str, Any] = field(default_factory=lambda: {"checked": False})
     ndps: dict[str, Any] = field(default_factory=dict)
     omitted: list[str] = field(default_factory=list)
     record_uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -77,6 +81,7 @@ class FTR:
             "card": self.card,
             "capture": self.capture,
             "colorimetry": self.colorimetry,
+            "liveness": self.liveness,
             "classification": self.classification,
             "location_bundle": self.location_bundle,
             "device": self.device,

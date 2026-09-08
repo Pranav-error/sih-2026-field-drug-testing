@@ -12,16 +12,18 @@ and the gate's own failures attached, which is what gets sealed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
-from .card import CARD_V1, CardSpec
+from .card import CARD_V1, CardSpec, tab_centre_mm
 from .colorimetry import ConformalClassifier, Prediction, RootPolynomial, srgb_to_linear, xyz_to_lab
 from .detect import (Detection, QualityGate, detect_card, estimate_illumination, grade_frame,
                      rectify, sample_patches, sample_well)
+from .parallax import ParallaxResult, check_liveness, measure_parallax
 
-__all__ = ["Measurement", "measure", "reference_xyz", "SRGB_TO_XYZ_D65"]
+__all__ = ["Measurement", "measure", "measure_pair", "reference_xyz",
+           "SRGB_TO_XYZ_D65"]
 
 # sRGB primaries under D65, scaled to Y = 100.
 SRGB_TO_XYZ_D65 = np.array([
@@ -53,6 +55,10 @@ class Measurement:
     illumination_residual_stops: float | None
     prediction: Prediction | None
     refusals: tuple[str, ...]              # why no result, in the operator's words
+    liveness: ParallaxResult | None = None
+    liveness_live: bool | None = None      # None when no second frame was supplied
+    liveness_reason: str = ""
+    liveness_geometry: tuple[float, float, float] | None = None  # (h, baseline, distance)
 
     @property
     def usable(self) -> bool:
@@ -62,6 +68,32 @@ class Measurement:
         if self.quality is None:
             return "Move back until all four corner markers are in frame."
         return self.quality.guidance()
+
+    def _liveness_fields(self) -> dict:
+        """The liveness block of an FTR.
+
+        Recorded even when unchecked, and explicitly so. A record with no liveness
+        block would be silently indistinguishable from one where the check was
+        skipped; ``checked: False`` says which it is.
+        """
+        if self.liveness is None or self.liveness_geometry is None:
+            return {"checked": False,
+                    "note": "single frame — this capture cannot be distinguished "
+                            "from a photograph of a card"}
+        h, baseline, distance = self.liveness_geometry
+        predicted_mm = baseline * h / max(distance - h, 1e-6)
+        return {
+            "checked": True,
+            "live": bool(self.liveness_live),
+            "displacement_px_x100": int(round(self.liveness.displacement_px * 100)),
+            "predicted_px_x100": int(round(predicted_mm * 10 * 100)),
+            "plane_residual_px_x100": int(round(self.liveness.plane_residual_px * 100)),
+            "confidence_x1000": int(round(self.liveness.confidence * 1000)),
+            "tab_height_mm_x10": int(round(h * 10)),
+            "baseline_mm_x10": int(round(baseline * 10)),
+            "distance_mm_x10": int(round(distance * 10)),
+            "reason": self.liveness_reason,
+        }
 
     def record_fields(self) -> dict:
         """The colorimetry and classification blocks of an FTR.
@@ -86,10 +118,11 @@ class Measurement:
             "gate_passed": self.quality.passed,
             "refusals": list(self.refusals),
         }
+        live = self._liveness_fields()
         if self.prediction is None:
-            return {"colorimetry": c}
+            return {"colorimetry": c, "liveness": live}
         p = self.prediction
-        return {"colorimetry": c, "classification": {
+        return {"colorimetry": c, "liveness": live, "classification": {
             "alpha_x1000": int(round(p.alpha * 1000)),
             "threshold_x1000": int(round(p.threshold * 1000)),
             "prediction_set": list(p.prediction_set),
@@ -139,3 +172,41 @@ def measure(image_bgr: np.ndarray, classifier: ConformalClassifier | None = None
         illumination_residual_stops=illum_residual,
         prediction=prediction, refusals=tuple(refusals),
     )
+
+
+def measure_pair(frame_a: np.ndarray, frame_b: np.ndarray,
+                 classifier: ConformalClassifier | None = None,
+                 spec: CardSpec = CARD_V1,
+                 baseline_mm: float = 50.0, distance_mm: float = 150.0) -> Measurement:
+    """Measure from two views, and check the scene was not flat.
+
+    Frame A carries the measurement; frame B exists only to establish depth. A
+    flat capture is treated exactly like any other gate failure: it becomes a
+    refusal, so the record is still sealed — deleting it is the attack the ledger
+    exists to stop — but it carries no result and states why.
+    """
+    m = measure(frame_a, classifier, spec)
+    if not m.detected or spec.tab_height_mm <= 0:
+        return m
+
+    det_b = detect_card(frame_b, spec)
+    if det_b is None or not det_b.complete:
+        return replace(
+            m, prediction=None,
+            refusals=m.refusals + ("the second frame does not show the card — "
+                                   "liveness could not be established",))
+
+    tab = tab_centre_mm(spec)
+    result = measure_parallax(frame_a, frame_b, m.detection, det_b, tab,
+                              baseline_mm=baseline_mm, distance_mm=distance_mm, spec=spec)
+    live, why = check_liveness(result, spec.tab_height_mm, baseline_mm, distance_mm)
+
+    refusals = m.refusals
+    prediction = m.prediction
+    if not live:
+        refusals = refusals + (why,)
+        prediction = None
+
+    return replace(m, liveness=result, liveness_live=live, liveness_reason=why,
+                   liveness_geometry=(spec.tab_height_mm, baseline_mm, distance_mm),
+                   refusals=refusals, prediction=prediction)

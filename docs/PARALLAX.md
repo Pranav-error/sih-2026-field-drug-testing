@@ -121,6 +121,51 @@ Two further limits, stated rather than discovered later:
   substituted sample. That is sample substitution, which no camera can detect, and
   it already sits in the verifier's UNVERIFIABLE bucket.
 
+## The defence has to reach the record
+
+A liveness check that lives only in the app is a demo. This project's thesis is
+that **the record is the product**, so the result is a top-level field of the FTR —
+a peer of `colorimetry` and `classification`, because whether the scene was
+physically present is a finding about the *test*, not a property of an image file:
+
+```
+liveness:
+  checked                 false means a single frame — absent is not the same as passed
+  live
+  displacement_px_x100    what was measured
+  predicted_px_x100       what the geometry required
+  plane_residual_px_x100  did the card itself re-align
+  confidence_x1000
+  tab_height_mm_x10 · baseline_mm_x10 · distance_mm_x10
+```
+
+Everything needed to re-check the arithmetic is in the record, so a reader can
+redo the sum rather than take the number on trust.
+
+**A flat capture is treated as a refusal, not an error.** The record is still
+sealed and chained — deleting it is the attack the ledger exists to stop — and it
+carries no result plus the reason. Exactly how a failed quality gate behaves.
+
+### What each verifier says
+
+| Record state | Verdict |
+|---|---|
+| Checked, live | **ASSERTED** — "the app measured 28.1 px against 28.2 px predicted… supply both frames to move this from asserted to proven" |
+| Checked, flat | **FAILURE** — "LIVENESS FAILED… The record is authentic; what it photographed is in question" |
+| Not checked | **ASSERTED** + an entry in **UNVERIFIABLE** — "cannot be distinguished from a photograph of a card" |
+
+That third row is the point of recording `checked: false` explicitly. A record with
+no liveness block would be silently indistinguishable from one where the check
+passed, and silence should never read as a pass.
+
+The failure text separates two things a court must not have conflated: the record
+is **unaltered**, and what it photographed is **in question**. Those are different
+findings and only one of them is about integrity.
+
+Both implementations report on liveness independently, in their own words, and are
+tested against each other — Dart cannot re-derive the parallax (it does not read
+frames) and says so rather than implying it checked.
+
 ## Reproducing
 
 ```sh

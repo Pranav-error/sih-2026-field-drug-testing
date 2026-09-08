@@ -150,6 +150,38 @@ Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
     });
   }
 
+  final live = (body['liveness'] as Map?) ?? const {};
+  if (live.isEmpty) {
+    r.asserted.add('This record carries no liveness block. It predates the check, or '
+        'was made by an app that does not perform one.');
+  } else if (live['checked'] != true) {
+    r.asserted.add('No liveness check was performed — a single frame was captured. '
+        'This record cannot be told apart from a photograph of a card, which is the '
+        'attack two-view parallax exists to refuse.');
+  } else {
+    final got = (live['displacement_px_x100'] as int? ?? 0) / 100;
+    final want = (live['predicted_px_x100'] as int? ?? 0) / 100;
+    final h = (live['tab_height_mm_x10'] as int? ?? 0) / 10;
+    if (live['live'] == true) {
+      r.asserted.add('The app measured ${got.toStringAsFixed(1)} px of parallax '
+          'against ${want.toStringAsFixed(1)} px predicted for the '
+          '${h.toStringAsFixed(0)} mm liveness tab, and concluded the scene had '
+          'depth. This implementation cannot re-derive that — it does not read '
+          'frames — so it stands as asserted.');
+    } else {
+      r.failures.add('LIVENESS FAILED at capture: ${got.toStringAsFixed(1)} px of '
+          'parallax against ${want.toStringAsFixed(1)} px predicted. The scene was '
+          'flat, which is what a photograph of a print or a screen looks like. The '
+          'record is authentic; what it photographed is in question.');
+    }
+  }
+
+  if (live['checked'] != true) {
+    r.unverifiable.add('Whether the strip photographed was physically present '
+        'rather than a printed or displayed image of one. Nothing in a single frame '
+        'can establish that.');
+  }
+
   final ts = body['captured_at'];
   if (ts is Map && ts['device_clock'] != null) {
     r.asserted.add('Capture time is stated as ${ts['device_clock']}, taken from the '
@@ -217,6 +249,9 @@ Report verifyChain(Directory root) {
 
   var bad = 0;
   final records = <SealedRecord>[];
+  // Per-record findings, counted rather than repeated. Forty copies of one caveat
+  // would bury the record that differs, which is the opposite of what a reader needs.
+  final seen = <String, int>{};
   for (final f in files) {
     final sub = verifyRecord(f.readAsBytesSync());
     if (!sub.ok) {
@@ -225,6 +260,9 @@ Report verifyChain(Directory root) {
         r.failures.add('record ${_stem(f.path)}: $x');
       }
     }
+    for (final item in sub.asserted) {
+      seen[item] = (seen[item] ?? 0) + 1;
+    }
     try {
       records.add(SealedRecord.fromEnvelope(f.readAsBytesSync()));
     } catch (_) {}
@@ -232,6 +270,18 @@ Report verifyChain(Directory root) {
   if (bad == 0) {
     r.proven.add('All ${files.length} records individually verify: canonical, hashed '
         'and signed.');
+  }
+
+  final n = files.length;
+  final keys = seen.keys.toList()
+    ..sort((a, b) {
+      final c = seen[b]!.compareTo(seen[a]!);
+      return c != 0 ? c : a.compareTo(b);
+    });
+  for (final item in keys) {
+    final count = seen[item]!;
+    final scope = count == n ? 'every record' : '$count of $n records';
+    r.asserted.add('[$scope] $item');
   }
 
   var prev = genesisHash;

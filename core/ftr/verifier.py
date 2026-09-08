@@ -186,7 +186,40 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
                 "hash in the record. The image has been altered since capture."
             )
 
-    # 5. claims the bundle carries but cannot support ----------------------- #
+    # 5. liveness ----------------------------------------------------------- #
+    live = body.get("liveness", {})
+    if not live:
+        r.asserted.append(
+            "This record carries no liveness block at all. It predates the check, or "
+            "the app that made it does not perform one."
+        )
+    elif not live.get("checked"):
+        r.asserted.append(
+            "No liveness check was performed — only one frame was captured. This "
+            "record cannot be distinguished from a photograph of a card, which is "
+            "the attack two-view parallax exists to refuse."
+        )
+    else:
+        got = live.get("displacement_px_x100", 0) / 100
+        want = live.get("predicted_px_x100", 0) / 100
+        h = live.get("tab_height_mm_x10", 0) / 10
+        base = live.get("baseline_mm_x10", 0) / 10
+        if live.get("live"):
+            r.asserted.append(
+                f"The app measured {got:.1f} px of parallax against {want:.1f} px "
+                f"predicted for the {h:.0f} mm liveness tab over a {base:.0f} mm "
+                "baseline, and concluded the scene had depth. Re-deriving this "
+                "requires both frames; supply them to move it from asserted to proven."
+            )
+        else:
+            r.failures.append(
+                f"LIVENESS FAILED at capture: {got:.1f} px of parallax against "
+                f"{want:.1f} px predicted. The scene was flat, which is what a "
+                "photograph of a print or a screen looks like. The record is "
+                "authentic; what it photographed is in question."
+            )
+
+    # 6. claims the bundle carries but cannot support ----------------------- #
     ts = body.get("captured_at", {})
     if "device_clock" in ts:
         r.asserted.append(
@@ -225,8 +258,14 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
     for ind in loc.get("spoof_indicators", []):
         r.asserted.append(f"Location anomaly recorded at capture: {ind}")
 
-    # 6. the floor ---------------------------------------------------------- #
+    # 7. the floor ---------------------------------------------------------- #
     cls = body.get("classification", {})
+    if not live.get("checked"):
+        r.unverifiable.append(
+            "Whether the strip photographed was physically present, rather than a "
+            "printed or displayed image of one. Nothing in a single frame can "
+            "establish that."
+        )
     r.unverifiable += [
         "Whether the substance photographed is the substance seized. No bundle of "
         "bytes can establish this; it rests on the seizure procedure and the witnesses.",
@@ -248,14 +287,24 @@ def verify_chain(root: Path, verbose: bool = False) -> Report:
         return r
 
     bad = 0
+    # Per-record findings, counted rather than repeated. A chain of forty records
+    # would otherwise print forty copies of the same caveat and bury the one that
+    # differs — which is the opposite of what a reader needs.
+    seen: dict[str, int] = {}
     for path in sorted(Path(root).glob("[0-9]*.ftr")):
         sub = verify_record(path.read_bytes())
         if not sub.ok:
             bad += 1
             r.failures += [f"record {path.stem}: {f}" for f in sub.failures]
+        for item in sub.asserted:
+            seen[item] = seen.get(item, 0) + 1
 
     if bad == 0:
         r.proven.append(f"All {n} records individually verify: canonical, hashed and signed.")
+
+    for item, count in sorted(seen.items(), key=lambda kv: (-kv[1], kv[0])):
+        scope = "every record" if count == n else f"{count} of {n} records"
+        r.asserted.append(f"[{scope}] {item}")
 
     st = chain.status()
     if st.intact:
