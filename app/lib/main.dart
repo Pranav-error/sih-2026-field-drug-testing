@@ -15,6 +15,7 @@ library;
 
 
 import 'src/measure_bridge.dart';
+import 'src/platform_keystore.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -96,9 +97,12 @@ class CaptureFlow extends StatefulWidget {
 class _CaptureFlowState extends State<CaptureFlow> {
   Step _step = Step.standby;
 
-  // A development key. It reports SOFTWARE, and everything downstream — this
-  // app's own standby screen included — treats that as disqualifying.
-  final _keystore = ftr.SoftwareKeystore();
+  // The signing key. On a handset this is the secure element; everywhere else
+  // it is a development key that honestly reports SOFTWARE, and every verifier
+  // treats that as disqualifying.
+  final _software = ftr.SoftwareKeystore();
+  PlatformKeystore? _hardware;
+  String _keystoreNote = '';
 
   Uint8List _chainHead = ftr.genesisHash;
   int _sequence = 0;
@@ -176,15 +180,41 @@ class _CaptureFlowState extends State<CaptureFlow> {
   }
 
   DevicePosture get _posture => DevicePosture(
-        securityLevel: _keystore.attestation().securityLevel,
-        verifiedBootState: _keystore.attestation().verifiedBootState,
-        bootloaderLocked: _keystore.attestation().bootloaderLocked,
-        osPatchLevel: _keystore.attestation().osPatchLevel,
+        securityLevel: _hardware?.securityLevel ??
+            _software.attestation().securityLevel,
+        // Not the app's to assert: the attestation certificate carries these and
+        // the verifier reads them from there. Shown as unknown until it does.
+        verifiedBootState: _hardware != null
+            ? 'IN ATTESTATION'
+            : _software.attestation().verifiedBootState,
+        bootloaderLocked: _hardware != null,
+        osPatchLevel: _hardware != null
+            ? 'IN ATTESTATION'
+            : _software.attestation().osPatchLevel,
         mockLocation: false,
         recordCount: _sequence,
         unanchored: _sequence,
         sinceAnchor: Duration(minutes: 4 * _sequence),
       );
+
+  @override
+  void initState() {
+    super.initState();
+    _openKeystore();
+  }
+
+  Future<void> _openKeystore() async {
+    // The challenge binds the attestation certificate to this installation
+    // rather than to a chain lifted from another handset.
+    final challenge = ftr.sha256(Uint8List.fromList(
+        'sih26231:${DateTime.now().toIso8601String()}'.codeUnits));
+    final ks = await PlatformKeystore.open(challenge: challenge);
+    if (!mounted) return;
+    setState(() {
+      _hardware = ks;
+      _keystoreNote = ks?.note ?? '';
+    });
+  }
 
   SecondView get _secondView =>
       SecondView(baselineMm: _baselineMm, cardVisible: true);
@@ -217,7 +247,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
     };
   }
 
-  void _seal() {
+  Future<void> _seal() async {
     final frame = Uint8List.fromList('frame $_sequence'.codeUnits);
     final body = ftr.buildBody(
       recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
@@ -254,7 +284,25 @@ class _CaptureFlowState extends State<CaptureFlow> {
       device: const {'verified_boot_state': 'UNKNOWN', 'bootloader_state': 'UNKNOWN'},
     );
 
-    final rec = ftr.seal(body, _keystore);
+    // Hardware signing is asynchronous — the key is inside the secure element
+    // and only the digest crosses the boundary.
+    final ftr.SealedRecord rec;
+    final hw = _hardware;
+    if (hw != null) {
+      final bodyCbor = ftr.encode(body);
+      final digest = ftr.sha256(bodyCbor);
+      final att = hw.attestation();
+      rec = ftr.SealedRecord(
+        bodyCbor: bodyCbor,
+        digest: digest,
+        signature: await hw.signAsync(digest),
+        publicKeyDer: att.publicKeyDer,
+        attestation: att.toRecord(),
+      );
+    } else {
+      rec = ftr.seal(body, _software);
+    }
+    if (!mounted) return;
     setState(() {
       _digestHex = ftr.hex(rec.digest);
       _chainHead = rec.digest;
@@ -271,6 +319,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       case Step.standby:
         return StandbyScreen(
           posture: _posture,
+          keystoreNote: _keystoreNote,
           onBegin: () => setState(() {
             _progress = 0;
             _step = Step.capture;

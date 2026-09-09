@@ -24,7 +24,9 @@ android {
         applicationId = "in.gov.ncb.sih26231.field_companion"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // StrongBox key generation is API 28+. Below that the app can still
+        // run, but there is no secure element to sign in and the record says so.
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -21,6 +21,7 @@ ftr/
   signing.py          keystore abstraction + attestation, honest about its level
   certificate.py      L6: BSA 2023 s.63 certificate, Part A auto-populated
   esakshya.py         L6: CCTNS-2.0 handoff bundle — not a parallel evidence store
+  attestation.py      read Android key attestation FROM THE CERTIFICATE
   verifier.py         proven / asserted / unverifiable
   cli.py              ftrverify · ftr-printable · ftr-ingest · ftr-certificate
 ```
@@ -30,7 +31,7 @@ ftr/
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 .venv/bin/python core/demo.py --keep /tmp/ftr-demo    # end-to-end + 4 attacks
-.venv/bin/python -m pytest core                        # 278 tests
+.venv/bin/python -m pytest core                        # 292 tests
 ./check.sh                                             # both implementations
 ```
 
@@ -150,7 +151,7 @@ rather than trusting the construction.
 | Synchronised stereo replay | Two-view parallax refuses a print or a screen, but replaying the genuine stereo pair in step with capture is not defended. See `docs/PARALLAX.md`. |
 | Real card, real ink | No printed card has been photographed. **This is the critical path** — see `docs/CAPTURE.md`. |
 | Reagent spectra | None exist publicly. Every "reaction" colour in every experiment is a ColorChecker patch standing in for chemistry. See `data/spectral/README.md`. |
-| Real attestation chain parsing | `cert_chain` is carried and counted, not walked to a Google root. Next task on this track. |
+| Attestation chain walking | The leaf certificate is parsed and its security level, verified-boot state and lock flag are read from it. The chain is **not** yet walked to a Google hardware root, so the certificate's own authenticity is unchecked — and the verifier says so. |
 | BSA §63 certificate emitter | **Built; Schedule transcribed from a bare-Act repository.** Still stamped DRAFT until someone compares it against the eGazette PDF and flips `verification_level` to `official`. See `docs/CERTIFICATE.md`. |
 | eSakshya ingest interface | Envelope is well-formed and marked PROVISIONAL. Nobody has yet established whether a documented ingest interface exists (§13 q2). |
 | Anchoring service | `Chain.anchor()` records a sequence number. The countersignature and the eSakshya receipt are not implemented. |
@@ -158,7 +159,7 @@ rather than trusting the construction.
 
 ## Test suite
 
-278 Python tests, plus 68 in Dart. The ones that matter most:
+292 Python tests, plus 68 in Dart. The ones that matter most:
 
 - `test_canonical_cbor.py` — RFC 8949 vectors, key ordering, and nine classes of
   non-canonical input that must be rejected.

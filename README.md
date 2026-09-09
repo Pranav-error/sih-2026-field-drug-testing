@@ -228,7 +228,7 @@ refused.
 | **0.0%** | wrong calls under an unseen illuminant — the system abstains instead |
 | **0.1 px** | parallax from a photo-lab print, against 28.2 px predicted for a physical card |
 | **2** | independently written verifiers that agree, in two languages |
-| **379** | automated tests |
+| **398** | automated tests |
 
 **Every one of these is measured on synthetic frames or on measured spectral data.
 None is a field accuracy.** No printed card has been photographed. See
@@ -243,7 +243,7 @@ None is a field accuracy.** No printed card has been photographed. See
 | **A** — colour pipeline | **Done and stress-tested.** Fiducials, homography, illumination correction, sampling, quality gate, device transform. Envelope swept over 83 conditions with 0 false accepts after three fixes. |
 | **B** — classification | **Done and ablated.** Conformal abstention with the finite-sample correction. Nearest-locus ΔE2000 beat Mahalanobis and logistic regression on held-out illuminants *and* held-out cameras, so L2 stays closed-form — no learned component, no TFLite. |
 | **C** — crypto / provenance | **Done twice.** Python and Dart, independently written, cross-checked against shared vectors in both directions. |
-| **D** — app | **Spine built, including the two-frame capture.** Standby → capture → second view → result → sealed, with real sealing through the shared package and the liveness block in the record. Camera, native L1 and StrongBox are not wired, and it has never run on a handset. |
+| **D** — app | **Built, and it runs standalone.** The whole L1/L2 pipeline and the two-view liveness check run on the handset in pure Dart — no laptop, no network, no native dependency. Signing uses StrongBox with an honest TEE fallback, and the attestation chain reaches the record.  Not yet run on a handset. |
 | **E** — legal / statutory | **Emitter built, Schedule transcribed.** Certificates carry the Act's real field labels and tick SHA256 as the Schedule names it. Still stamped DRAFT: the transcription is from a bare-Act repository, not the Gazette. **Remaining: one comparison against the eGazette PDF.** |
 | **F** — data | **Not started, and it is the critical path.** Card is printable, ingest tooling and protocol are built. It needs a person, a printer and a weekend. |
 

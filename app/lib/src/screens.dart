@@ -24,10 +24,15 @@ class StandbyScreen extends StatelessWidget {
     this.bridgeEndpoint,
     this.bridgeReachable,
     this.onEditBridge,
+    this.keystoreNote,
   });
 
   final DevicePosture posture;
   final VoidCallback? onBegin;
+
+  /// Why the hardware guarantee is weaker than requested, when it is — for
+  /// instance a handset with no discrete secure element falling back to the TEE.
+  final String? keystoreNote;
 
   /// Retained so the web build can still point at a bridge; the handset build
   /// measures on-device and leaves these null.
@@ -57,6 +62,10 @@ class StandbyScreen extends StatelessWidget {
           Measured('Mock location', posture.mockLocation ? 'ON' : 'Off',
               tone: posture.mockLocation ? Tokens.abstain : Tokens.negative),
         ]),
+        if (keystoreNote != null && keystoreNote!.isNotEmpty)
+          PresumptiveNotice(detail: keystoreNote!),
+        if (keystoreNote != null && keystoreNote!.isNotEmpty)
+          const SizedBox(height: 12),
         if (!hw)
           const PresumptiveNotice(
             detail: 'This build signs with a software key. Records it produces are '

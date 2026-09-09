@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .attestation import parse_attestation
 from .canonical_cbor import dumps, is_canonical, loads
 from .chain import Chain
 from .record import SealedRecord
@@ -118,6 +119,51 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
     # 3. what the key actually proves --------------------------------------- #
     att = rec.attestation or {}
     level = att.get("security_level", "UNKNOWN")
+
+    # The certificate outranks the record. Everything in `att` was written by the
+    # app; the attestation extension was written by the secure element and signed
+    # by it. Where they disagree the certificate wins, and the disagreement is
+    # itself reported — an app claiming more than its own hardware attests to is
+    # the single most interesting thing a verifier could find.
+    chain = att.get("cert_chain") or []
+    info = parse_attestation(chain[0]) if chain else None
+    if info is not None:
+        level = info.attestation_security_level
+        r.proven.append(
+            f"The attestation certificate states the key is {level}-backed. This "
+            "is read from the certificate, not from the record: the app's own "
+            "claim about its hardware carries no weight."
+        )
+        claimed = att.get("security_level")
+        if claimed and claimed != level:
+            r.failures.append(
+                f"The record claims a {claimed} key; the attestation certificate "
+                f"says {level}. The record overstates its own hardware."
+            )
+        if info.verified_boot_state is not None:
+            if info.boot_colour == "GREEN" and info.device_locked:
+                r.proven.append(
+                    "Verified boot was GREEN and the bootloader locked, per the "
+                    "attestation certificate: the device was running unmodified "
+                    "signed firmware when the key was created."
+                )
+            else:
+                r.failures.append(
+                    f"Verified boot is {info.boot_colour} and the bootloader "
+                    f"{'locked' if info.device_locked else 'unlocked'}, per the "
+                    "attestation certificate. The key was created on a modified "
+                    "device."
+                )
+        else:
+            r.asserted.append(
+                "The attestation certificate carries no root-of-trust block, so "
+                "verified boot state could not be read from it."
+            )
+        r.asserted.append(
+            f"The attestation chain is {len(chain)} certificate(s) long. This "
+            "verifier reads the leaf but does not yet walk the chain to a Google "
+            "hardware root, so the certificate's own authenticity is unchecked."
+        )
     if level == "STRONGBOX":
         r.proven.append(
             "Key attestation states the signing key was generated in StrongBox, a "
@@ -143,12 +189,14 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
         )
 
     vbs = att.get("verified_boot_state", "UNKNOWN")
-    if vbs == "GREEN" and att.get("bootloader_locked"):
+    if info is not None:
+        pass          # already reported from the certificate, which outranks this
+    elif vbs == "GREEN" and att.get("bootloader_locked"):
         r.proven.append(
             "Verified boot was GREEN and the bootloader locked when the key was "
             "attested: the device was running unmodified signed firmware."
         )
-    elif vbs == "UNKNOWN":
+    elif vbs in ("UNKNOWN", "IN_ATTESTATION"):
         r.asserted.append("Verified boot state is unknown; device integrity is not established.")
     else:
         r.failures.append(
@@ -157,7 +205,7 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
             "The record was produced on a modified device."
         )
 
-    if not att.get("cert_chain_len"):
+    if not att.get("cert_chain_len") and not chain:
         r.asserted.append(
             "No attestation certificate chain is present, so the hardware claims above "
             "cannot be traced to a root certificate authority."

@@ -51,6 +51,10 @@ class Attestation {
 
   Map<String, Object?> toRecord() => {
         'security_level': securityLevel,
+        // The chain itself, not a count. A verifier must be able to walk it to a
+        // hardware root and read verified-boot state from the certificate rather
+        // than taking the app's word for either.
+        if (certChain.isNotEmpty) 'cert_chain': certChain,
         'verified_boot_state': verifiedBootState,
         'bootloader_locked': bootloaderLocked,
         'os_patch_level': osPatchLevel,
