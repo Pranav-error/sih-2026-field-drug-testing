@@ -445,6 +445,7 @@ class SealedScreen extends StatelessWidget {
     required this.anchorWindow,
     required this.anchored,
     this.stored = false,
+    this.storeError,
   });
 
   final String digestHex;
@@ -456,6 +457,10 @@ class SealedScreen extends StatelessWidget {
   /// Whether the record reached storage. A record that is shown but not written
   /// is not a record, so the screen must not imply it was kept.
   final bool stored;
+
+  /// Why the write failed, when it did. A record that is not on disk is not in
+  /// the chain, and an officer who cannot see the reason cannot fix it.
+  final String? storeError;
 
   @override
   Widget build(BuildContext context) {
@@ -475,6 +480,17 @@ class SealedScreen extends StatelessWidget {
         Panel(title: 'Storage', children: [
           Measured('Written to the ledger', stored ? 'Yes' : 'NO — memory only',
               tone: stored ? Tokens.negative : Tokens.abstain),
+          if (!stored && storeError != null) ...[
+            const SizedBox(height: 4),
+            Text(storeError!,
+                style: Tokens.monoStyle(size: 10, colour: Tokens.negative)),
+            const SizedBox(height: 2),
+            const Text(
+              'This record exists only in memory. It is not in the chain, and '
+              'closing the app loses it.',
+              style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+            ),
+          ],
         ]),
         Panel(title: 'Signature', children: [
           Measured('Key', securityLevel,

@@ -134,15 +134,25 @@ object HardwareKeystore {
         }
     }
 
-    /** Sign a digest with the hardware key. The key never leaves the element. */
-    fun sign(digest: ByteArray): ByteArray {
+    /**
+     * Sign the record **body** with the hardware key. It never leaves the element.
+     *
+     * The body, not its digest. The key is generated with
+     * `setDigests(DIGEST_SHA256)` and Android enforces that list at use time, so
+     * asking for `NONEwithECDSA` over a pre-computed digest throws
+     * `InvalidKeyException` — which is exactly what reached a handset as
+     * *"Could not seal: PlatformException(keystore, InvalidKeyException)"*.
+     *
+     * `SHA256withECDSA` over the body produces a signature over SHA-256(body),
+     * and SHA-256(body) *is* the record digest. So this is the same signature
+     * the Prehashed path on the Python side produces, and both verifiers check
+     * it unchanged. Nothing above this line had to move.
+     */
+    fun sign(body: ByteArray): ByteArray {
         val entry = keyStore().getEntry(ALIAS, null) as KeyStore.PrivateKeyEntry
-        // NONEwithECDSA: the digest IS the artefact, so it is signed directly
-        // rather than re-hashed into something the verifier would have to
-        // reproduce. Matches the Prehashed path on the Python side.
-        return Signature.getInstance("NONEwithECDSA").run {
+        return Signature.getInstance("SHA256withECDSA").run {
             initSign(entry.privateKey)
-            update(digest)
+            update(body)
             sign()
         }
     }

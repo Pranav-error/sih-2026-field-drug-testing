@@ -129,6 +129,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
   ftr.Report? _report;
   String? _sealError;
   bool _storedOk = false;
+  String? _storeError;
   PlatformKeystore? _hardware;
   String _keystoreNote = '';
 
@@ -407,6 +408,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
     // Persist before anything else. A record that is shown but not written is
     // not a record, and the ledger's guarantees are about files on disk.
     var stored = false;
+    String? storeError;
     try {
       if (_store != null) {
         _store!.append(rec);
@@ -415,8 +417,12 @@ class _CaptureFlowState extends State<CaptureFlow> {
         _store!.writeFrames(rec.sequence, frameA: frame, frameB: _frameB);
         stored = true;
       }
-    } catch (_) {
+    } catch (e) {
+      // The reason must reach the screen. "NO — memory only" with no cause is
+      // the same silence that let the seal failure vanish: an officer cannot
+      // act on it, and neither can anyone reading the log afterwards.
       stored = false;
+      storeError = '$e';
     }
 
     final schedule = await ScheduleLoader.load();
@@ -428,6 +434,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       _report = ftr.verifyRecord(ftr.toEnvelope(rec));
       _sealError = null;
       _storedOk = stored;
+      _storeError = storeError;
       _digestHex = ftr.hex(rec.digest);
       _chainHead = rec.digest;
       if (!stored) _sequence += 1;
@@ -626,6 +633,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return Scaffold(
           body: SealedScreen(
             stored: _storedOk,
+            storeError: _storeError,
             digestHex: _digestHex,
             // The store owns sequencing once it exists; _sequence is only the
             // in-memory fallback for a platform with no filesystem.

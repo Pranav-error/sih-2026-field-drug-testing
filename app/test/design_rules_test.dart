@@ -219,6 +219,36 @@ void main() {
       expect(find.textContaining('no earlier than record #47'), findsOneWidget);
     });
 
+    testWidgets('a record that failed to persist says why, not just that it did',
+        (t) async {
+      // "NO — memory only" with no cause is the same silence that let the seal
+      // failure vanish for a build. An officer cannot act on it.
+      await t.pumpWidget(wrap(SealedScreen(
+        digestHex: 'ef' * 32,
+        sequence: 3,
+        securityLevel: 'STRONGBOX',
+        anchorWindow: '1m',
+        anchored: false,
+        stored: false,
+        storeError: 'FileSystemException: No space left on device',
+      )));
+      expect(find.textContaining('NO — memory only'), findsOneWidget);
+      expect(find.textContaining('No space left on device'), findsOneWidget);
+      expect(find.textContaining('not in the chain'), findsOneWidget);
+    });
+
+    testWidgets('a record that persisted carries no failure text', (t) async {
+      await t.pumpWidget(wrap(SealedScreen(
+        digestHex: 'ef' * 32,
+        sequence: 3,
+        securityLevel: 'STRONGBOX',
+        anchorWindow: '1m',
+        anchored: false,
+        stored: true,
+      )));
+      expect(find.textContaining('not in the chain'), findsNothing);
+    });
+
     testWidgets('the digest is selectable, because it gets copied', (t) async {
       await t.pumpWidget(wrap(SealedScreen(
         digestHex: 'cd' * 32,
