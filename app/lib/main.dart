@@ -18,6 +18,7 @@ import 'src/measure_bridge.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 import 'src/certificate.dart';
+import 'src/location.dart';
 import 'src/platform_keystore.dart';
 import 'src/screens_extra.dart';
 import 'src/store.dart';
@@ -110,6 +111,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
   String _reagent = 'Marquis';
   String _operatorId = '';
   Map<String, Object?> _deviceInfo = const {};
+  String _cardId = 'CARD-IN-2026-0417';
+  String _printBatch = 'B12';
   String _fir = '';
   String _memo = '';
   Certificate? _certificate;
@@ -310,7 +313,12 @@ class _CaptureFlowState extends State<CaptureFlow> {
 
   Future<void> _sealInner() async {
     final shown = _live?.result ?? _result;
-    final frame = _frameA ?? Uint8List.fromList('frame $_sequence'.codeUnits);
+    // Read the position at the moment of sealing, not at app start.
+    final fix = await LocationReader.read();
+    final frame = _frameA;
+    if (frame == null) {
+      throw StateError('no captured frame to seal — capture one first');
+    }
     final body = ftr.buildBody(
       recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
       sequence: _store?.nextSequence ?? _sequence,
@@ -326,7 +334,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
         'identified': _operatorId.isNotEmpty,
       },
       kit: {'reagent_type': _reagent.toLowerCase()},
-      card: {'card_id': 'CARD-IN-2026-0417', 'print_batch': 'B12'},
+      card: {'card_id': _cardId, 'print_batch': _printBatch},
       capture: {
         'raw_image_sha256': ftr.sha256(frame),
         // The second view is evidence too, and is bound like the first.
@@ -359,8 +367,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
       // Which implementation produced these numbers. A verifier re-running the
       // reference pipeline needs to know why the last digit may differ.
       pipelineName: 'dart-on-device',
-      locationBundle: const {'corroboration_channels_agreeing': 4,
-        'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
+      // A real fix, or an explicit statement that there is none. Never four
+      // invented channels agreeing about a position nobody read.
+      locationBundle: fix.toRecord(),
       // Verified boot and bootloader state are deliberately absent: they live in
       // the attestation certificate, and the app must not assert them.
       device: {..._deviceInfo, 'state_source': 'attestation certificate'},
@@ -390,8 +399,13 @@ class _CaptureFlowState extends State<CaptureFlow> {
     // not a record, and the ledger's guarantees are about files on disk.
     var stored = false;
     try {
-      _store?.append(rec);
-      stored = _store != null;
+      if (_store != null) {
+        _store!.append(rec);
+        // The frames go beside the record, so the verifier's image check is
+        // something a reader can actually run.
+        _store!.writeFrames(rec.sequence, frameA: frame, frameB: _frameB);
+        stored = true;
+      }
     } catch (_) {
       stored = false;
     }
@@ -423,6 +437,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
           onReagent: (r) => setState(() => _reagent = r),
           operatorId: _operatorId,
           onOperator: (v) => _operatorId = v,
+          cardId: _cardId,
+          onCardId: (v) => _cardId = v,
+          printBatch: _printBatch,
+          onPrintBatch: (v) => _printBatch = v,
           firRef: _fir,
           memoRef: _memo,
           onFir: (v) => _fir = v,
@@ -451,6 +469,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
           records: _store?.records() ?? const [],
           intact: st?.intact ?? true,
           breaks: st?.breaks ?? const [],
+          storePath: _store?.path ?? 'no filesystem on this platform',
+          bytesUsed: _store?.bytesUsed ?? 0,
           onOpen: (i) => setState(() {
             final rec = _store!.records()[i];
             _report = ftr.verifyRecord(ftr.toEnvelope(rec));

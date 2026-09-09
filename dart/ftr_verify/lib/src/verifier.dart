@@ -231,10 +231,23 @@ Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
   if (loc is Map) {
     final agree = loc['corroboration_channels_agreeing'] as int?;
     final total = loc['corroboration_channels_total'] as int?;
-    if (agree != null && total != null && total > 0) {
-      if (agree == total) {
-        r.proven.add('All $total independent location channels agreed at capture '
-            '(GNSS geometry, Wi-Fi neighbourhood, serving cell, kinematics).');
+    final notCollected =
+        ((loc['channels_not_collected'] as List?) ?? const []).join(', ');
+    if (loc['available'] == false) {
+      r.asserted.add('No position was recorded: '
+          '${loc['status'] ?? 'reason not stated'}. Nothing in this record places '
+          'it anywhere.');
+    } else if (agree != null && total != null && total > 0) {
+      final collected =
+          ((loc['channels_collected'] as List?) ?? const ['unspecified']).join(', ');
+      if (agree == total && total < 2) {
+        // One agreeing channel is not corroboration. Calling it "all channels
+        // agreed" would be true and deeply misleading.
+        r.asserted.add('$agree of $total location channel(s) agreed — collected: '
+            '$collected. NOT collected: $notCollected. A single channel is a claim, '
+            'not corroboration.');
+      } else if (agree == total) {
+        r.proven.add('All $total independent location channels agreed at capture.');
       } else {
         r.asserted.add('Only $agree of $total location channels agreed. The '
             'disagreement is recorded below and is available to either party.');

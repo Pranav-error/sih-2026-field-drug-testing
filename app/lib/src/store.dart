@@ -51,6 +51,39 @@ class RecordStore {
       .map((f) => ftr.SealedRecord.fromEnvelope(f.readAsBytesSync()))
       .toList();
 
+  /// Write the frames a record refers to, beside it.
+  ///
+  /// Without this the record carries `raw_image_sha256` for an image that exists
+  /// nowhere, so the verifier's strongest image check — *"the supplied frame
+  /// hashes to the value in the record"* — could never be run. A hash of a file
+  /// nobody kept proves nothing.
+  void writeFrames(int sequence, {Uint8List? frameA, Uint8List? frameB}) {
+    final stem = sequence.toString().padLeft(6, '0');
+    if (frameA != null) {
+      File('${_dir.path}/$stem.a.jpg').writeAsBytesSync(frameA);
+    }
+    if (frameB != null) {
+      File('${_dir.path}/$stem.b.jpg').writeAsBytesSync(frameB);
+    }
+  }
+
+  /// The frames belonging to a record, if they were kept.
+  ({Uint8List? a, Uint8List? b}) frames(int sequence) {
+    final stem = sequence.toString().padLeft(6, '0');
+    final fa = File('${_dir.path}/$stem.a.jpg');
+    final fb = File('${_dir.path}/$stem.b.jpg');
+    return (
+      a: fa.existsSync() ? fa.readAsBytesSync() : null,
+      b: fb.existsSync() ? fb.readAsBytesSync() : null,
+    );
+  }
+
+  /// Bytes on disk, so the log can say what the ledger is costing.
+  int get bytesUsed => _dir
+      .listSync()
+      .whereType<File>()
+      .fold<int>(0, (n, f) => n + f.lengthSync());
+
   /// Write a sealed record. Refuses to overwrite, and refuses a record that does
   /// not chain — the same two guards the Python `Chain.append` applies.
   File append(ftr.SealedRecord rec) {

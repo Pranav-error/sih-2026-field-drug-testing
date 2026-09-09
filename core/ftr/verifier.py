@@ -303,11 +303,21 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
     loc = body.get("location_bundle", {})
     score = loc.get("corroboration_channels_agreeing")
     total = loc.get("corroboration_channels_total")
-    if score is not None and total:
+    not_collected = loc.get("channels_not_collected") or []
+    if loc.get("available") is False:
+        r.asserted.append(
+            f"No position was recorded: {loc.get('status', 'reason not stated')}. "
+            "Nothing in this record places it anywhere."
+        )
+    elif score is not None and total:
+        collected = ", ".join(loc.get("channels_collected") or ["unspecified"])
         if score == total:
-            r.proven.append(
-                f"All {total} independent location channels agreed at capture "
-                "(GNSS geometry, Wi-Fi neighbourhood, serving cell, kinematics)."
+            # A single agreeing channel is not corroboration. Reporting it as
+            # "all channels agreed" would be true and deeply misleading.
+            r.asserted.append(
+                f"{score} of {total} location channel(s) agreed — collected: {collected}. "
+                + (f"NOT collected: {', '.join(not_collected)}. A single channel is a "
+                   "claim, not corroboration." if total < 2 else "")
             )
         else:
             r.asserted.append(

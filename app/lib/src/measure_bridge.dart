@@ -11,14 +11,12 @@
 /// frame in front of the camera.
 library;
 
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
 import 'package:ftr_verify/ftr_verify.dart' as ftr;
-import 'package:http/http.dart' as http;
 
 import 'models.dart';
 
@@ -204,132 +202,3 @@ class OnDeviceMeasurer {
   }
 }
 
-class MeasureBridge {
-  MeasureBridge({String? endpoint})
-      : endpoint = endpoint ??
-            const String.fromEnvironment('BRIDGE',
-                defaultValue: 'http://127.0.0.1:8824/');
-
-  /// Where the pipeline is running.
-  ///
-  /// On a handset `127.0.0.1` is the phone itself, which has no bridge — so for
-  /// an APK demo this must point at the laptop's address on the same network.
-  /// Set it at build time with `--dart-define=BRIDGE=http://192.168.1.20:8824/`,
-  /// or edit it in the app, because a venue's addresses are never the ones you
-  /// built against.
-  String endpoint;
-  bool _inFlight = false;
-
-  /// True once a request has come back from a real bridge.
-  bool reachable = false;
-
-  Future<bool> ping() async {
-    try {
-      final r = await http
-          .get(Uri.parse(endpoint))
-          .timeout(const Duration(seconds: 4));
-      reachable = r.statusCode == 200;
-    } catch (_) {
-      reachable = false;
-    }
-    return reachable;
-  }
-
-  /// Measure two frames together: the colour from the first, and the liveness
-  /// from the pair. This is the call the second view makes.
-  Future<Measurement?> measurePair(Uint8List a, Uint8List b) async {
-    if (_inFlight) return null;
-    _inFlight = true;
-    try {
-      final response = await http
-          .post(Uri.parse(endpoint),
-              headers: const {'Content-Type': 'application/json'},
-              body: jsonEncode({'frame': base64Encode(a), 'frame_b': base64Encode(b)}))
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode != 200) return Measurement.unavailable;
-      reachable = true;
-      return _parse(jsonDecode(response.body) as Map<String, dynamic>);
-    } catch (_) {
-      reachable = false;
-      return Measurement.unavailable;
-    } finally {
-      _inFlight = false;
-    }
-  }
-
-  /// Measure one frame. Returns null when a request is already in flight, so a
-  /// slow round trip cannot queue up behind the viewfinder's frame rate.
-  Future<Measurement?> measure(Uint8List jpeg) async {
-    if (_inFlight) return null;
-    _inFlight = true;
-    try {
-      final response = await http
-          .post(Uri.parse(endpoint),
-              headers: const {'Content-Type': 'application/json'},
-              body: jsonEncode({'frame': base64Encode(jpeg)}))
-          .timeout(const Duration(seconds: 12));
-      if (response.statusCode != 200) return Measurement.unavailable;
-      reachable = true;
-      return _parse(jsonDecode(response.body) as Map<String, dynamic>);
-    } catch (_) {
-      reachable = false;
-      return Measurement.unavailable;
-    } finally {
-      _inFlight = false;
-    }
-  }
-
-  Measurement _parse(Map<String, dynamic> j) {
-    double d(String k, [double fallback = 0]) =>
-        (j[k] as num?)?.toDouble() ?? fallback;
-
-    final quality = CaptureQuality(
-      fiducialsFound: (j['fiducials'] as num?)?.toInt() ?? 0,
-      illumination: d('illumination'),
-      focus: d('focus'),
-      tiltDegrees: d('tilt_degrees', 90),
-      clippedFraction: d('clipped'),
-    );
-
-    TestResult? result;
-    final p = j['prediction'] as Map<String, dynamic>?;
-    if (p != null) {
-      result = TestResult(
-        predictionSet: (p['set'] as List).cast<String>(),
-        label: p['label'] as String?,
-        lab: (j['lab'] as List?)?.map((v) => (v as num).toDouble()).toList(),
-        alpha: (p['alpha'] as num).toDouble(),
-        threshold: (p['threshold'] as num).toDouble(),
-        scores: (p['scores'] as Map).map(
-            (k, v) => MapEntry(k as String, (v as num).toDouble())),
-      );
-    }
-
-    Liveness? live;
-    final l = j['liveness'] as Map<String, dynamic>?;
-    if (l != null) {
-      live = l['checked'] == true
-          ? Liveness(
-              checked: true,
-              live: l['live'] == true,
-              measuredPx: (l['displacement_px'] as num).toDouble(),
-              predictedPx: (l['floor_px'] as num?)?.toDouble() ?? 2.0,
-              reason: l['reason'] as String? ?? '',
-            )
-          : const Liveness.notChecked();
-    }
-
-    return Measurement(
-      liveness: live,
-      detected: j['detected'] == true,
-      fiducials: quality.fiducialsFound,
-      guidance: j['guidance'] as String? ?? 'Hold steady.',
-      gatePassed: j['gate_passed'] == true,
-      refusals: ((j['refusals'] as List?) ?? const []).cast<String>(),
-      lab: (j['lab'] as List?)?.map((v) => (v as num).toDouble()).toList(),
-      cardResidual: (j['card_residual'] as num?)?.toDouble(),
-      quality: quality,
-      result: result,
-    );
-  }
-}

@@ -5,7 +5,15 @@
     <!-- Reaching the measure bridge on a laptop over the local network. The real
          architecture runs L1/L2 natively on-device and needs neither of these;
          this is the demo path until that native pipeline exists. -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- No INTERNET permission, deliberately. The app measures, signs and
+         stores entirely on the handset, so Android itself enforces what the
+         design claims: nothing this app records can leave over the network.
+         Adding this line back would weaken the guarantee, not add a feature. -->
+    <!-- The record carries where the test happened, or states plainly that it
+         does not. Coarse is requested alongside fine so a refusal of fine still
+         yields something honest rather than nothing. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <application
         android:label="Field Companion"

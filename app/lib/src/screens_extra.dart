@@ -32,6 +32,10 @@ class SetupScreen extends StatelessWidget {
     required this.onReagent,
     required this.operatorId,
     required this.onOperator,
+    required this.cardId,
+    required this.onCardId,
+    required this.printBatch,
+    required this.onPrintBatch,
     required this.firRef,
     required this.memoRef,
     required this.onFir,
@@ -43,6 +47,10 @@ class SetupScreen extends StatelessWidget {
   final ValueChanged<String> onReagent;
   final String operatorId;
   final ValueChanged<String> onOperator;
+  final String cardId;
+  final ValueChanged<String> onCardId;
+  final String printBatch;
+  final ValueChanged<String> onPrintBatch;
   final String firRef;
   final String memoRef;
   final ValueChanged<String> onFir;
@@ -86,6 +94,20 @@ class SetupScreen extends StatelessWidget {
             'Declared by you, not read from the kit. The system works with '
             'whatever reagent the department already buys — no serialised pouch, '
             'no vendor lock-in.',
+            style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
+          ),
+        ]),
+        Panel(title: 'Reference card', children: [
+          _Field(label: 'Card ID', value: cardId, onChanged: onCardId,
+              hint: 'CARD-IN-2026-0417'),
+          const SizedBox(height: 8),
+          _Field(label: 'Print batch', value: printBatch, onChanged: onPrintBatch,
+              hint: 'B12'),
+          const SizedBox(height: 8),
+          const Text(
+            'Printed on the card itself. The batch matters: patch colours are '
+            'nominal until a batch is measured, and a verifier needs to know '
+            'which card produced a reading.',
             style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
           ),
         ]),
@@ -248,6 +270,8 @@ class LogScreen extends StatelessWidget {
     required this.records,
     required this.intact,
     required this.breaks,
+    required this.storePath,
+    required this.bytesUsed,
     this.onOpen,
     this.onBack,
   });
@@ -255,6 +279,11 @@ class LogScreen extends StatelessWidget {
   final List<ftr.SealedRecord> records;
   final bool intact;
   final List<String> breaks;
+
+  /// Where the ledger actually lives, and what it costs. Shown because "records
+  /// are stored" is a claim, and a path plus a byte count is a fact.
+  final String storePath;
+  final int bytesUsed;
   final ValueChanged<int>? onOpen;
   final VoidCallback? onBack;
 
@@ -266,6 +295,23 @@ class LogScreen extends StatelessWidget {
           colour: intact ? Tokens.negative : Tokens.positive,
           soft: intact ? Tokens.negativeSoft : Tokens.positiveSoft),
       body: [
+        Panel(title: 'Storage', children: [
+          const Measured('Location', 'This device only', tone: Tokens.negative),
+          const Measured('Network', 'No INTERNET permission', tone: Tokens.positive),
+          const Measured('Server', 'None — CCTNS-2.0 is the system of record'),
+          Measured('On disk',
+              '${(bytesUsed / 1024).toStringAsFixed(0)} KB'),
+          const SizedBox(height: 3),
+          Text(storePath,
+              style: Tokens.monoStyle(size: 9.5, colour: Tokens.muted)),
+          const SizedBox(height: 6),
+          const Text(
+            'An append-only directory of signed files, plus the frames each '
+            'record refers to. Nothing is uploaded, and nothing needs to be: '
+            'the record is complete and verifiable on its own.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+          ),
+        ]),
         Panel(title: 'Chain integrity', tint: true, children: [
           Measured('Records on device', '${records.length}'),
           Measured('Gaps or forks', intact ? 'None' : '${breaks.length}',
