@@ -427,7 +427,7 @@ build, which has no OpenCV and no Dart-side camera pipeline equivalent in browse
 | 4 | **Result** | reads the set, taps *Seal record* | none — an abstention seals too | → sealed |
 | 5 | **Record sealed** | reads the digest, taps *Done* | — | → standby |
 
-All nine screens from `DESIGN.md` are built:
+All ten screens from `DESIGN.md` are built:
 
 | # | Screen | File |
 |---|---|---|
@@ -441,6 +441,7 @@ All nine screens from `DESIGN.md` are built:
 | 7 | Record log | `screens_extra.dart::LogScreen` |
 | 8 | §63 certificate + eSakshya envelope | `screens_extra.dart::CertificateScreen` |
 | 9 | Verifier report | `screens_extra.dart::VerifierScreen` |
+| 10 | Handoff — bundle export, anchoring, what is *not* claimed | `screens_extra.dart::HandoffScreen` |
 
 ---
 

@@ -330,7 +330,7 @@ flagged, never recalled. → [`DETERMINISM.md`](docs/DETERMINISM.md)
 - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) — seven layers, the threat model, data strategy, build plan
 - [`NOVELTY.md`](docs/NOVELTY.md) — prior art conceded, what survives it, the §3(k) problem
 - [`DESIGN.md`](docs/DESIGN.md) — interface spec: tokens, the seven rules every screen obeys
-- [`app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype
+- [`app-prototype.html`](docs/app-prototype.html) — clickable nine-screen prototype (predates screen 10 — see [`DESIGN.md`](docs/DESIGN.md))
 
 **What was measured**
 - [`ROBUSTNESS.md`](docs/ROBUSTNESS.md) — the operating envelope, three defects found, the ablation, and what changed under measured physics

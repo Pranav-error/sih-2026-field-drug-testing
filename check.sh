@@ -34,4 +34,4 @@ echo "== dart seals, python verifies (the direction that matters) =="
 
 echo
 echo "== flutter app =="
-(cd app && flutter test --reporter=compact 2>&1 | tail -2)
+(cd app && flutter test --reporter=compact 2>&1 | tr "\\r" "\\n" | grep -E "All tests passed|\\[E\\]" | tail -3)

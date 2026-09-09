@@ -20,6 +20,16 @@ class RecordStore {
 
   final Directory _dir;
 
+  /// Open a store rooted at a directory of your choosing.
+  ///
+  /// Exists so the ledger and the handoff bundle can be exercised in a test
+  /// without a platform channel. The export path shipping without ever having
+  /// run once is exactly how the seal button reached a handset doing nothing.
+  static RecordStore at(Directory dir) {
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return RecordStore._(dir);
+  }
+
   static Future<RecordStore> open() async {
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/ftr-chain');
@@ -28,6 +38,18 @@ class RecordStore {
   }
 
   String get path => _dir.path;
+
+  /// Where bundles are written — a **sibling** of the ledger, never inside it.
+  ///
+  /// Exports are derived, deletable and re-creatable; the ledger is none of
+  /// those. Nesting them would put mutable files under the directory whose
+  /// whole contract is that nothing in it changes, and would make "clear
+  /// exports" a command that walks the evidence directory.
+  Directory get exportRoot {
+    final d = Directory('${_dir.parent.path}/ftr-export');
+    if (!d.existsSync()) d.createSync(recursive: true);
+    return d;
+  }
 
   List<File> get _files => _dir
       .listSync()

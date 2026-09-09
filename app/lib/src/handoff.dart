@@ -51,7 +51,7 @@ Future<BundleResult> exportChain(
   }
 
   final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '');
-  final dir = Directory('${store.path}/export/${stamp.substring(0, 15)}Z');
+  final dir = Directory('${store.exportRoot.path}/${stamp.substring(0, 15)}Z');
   dir.createSync(recursive: true);
 
   final written = <File>[];

@@ -2,7 +2,7 @@
 
 **SIH26231** · Digital Companion for Field Drug Testing · v0.1, internal round
 
-Interactive prototype: [`app-prototype.html`](app-prototype.html) — nine screens, clickable,
+Interactive prototype: [`app-prototype.html`](app-prototype.html) — nine screens, clickable (it predates screen 10),
 with the design rationale beside each one. This file is the written spec that prototype encodes.
 
 Read [`ARCHITECTURE.md`](ARCHITECTURE.md) first. Every interface decision below is downstream of its
@@ -70,7 +70,7 @@ keeps the app feeling like an instrument and the exports feeling like documents.
 
 ---
 
-## 3. The nine screens
+## 3. The ten screens
 
 | # | Screen | Purpose | Primary action |
 |---|---|---|---|
@@ -81,9 +81,10 @@ keeps the app feeling like an instrument and the exports feeling like documents.
 | 04 | **Frame accepted** | Normalisation report + location corroboration, *before* any result | Read result |
 | 05 | **Result** | Prediction set, ΔE basis, α — with an abstention variant | Seal record |
 | 06 | **Record sealed** | Digest, signature, attestation, chain position, anchor window | Generate certificate |
-| 07 | **Record log** | Append-only ledger including the unflattering entries | Export |
+| 07 | **Record log** | Append-only ledger including the unflattering entries; storage and network posture | Handoff to CCTNS-2.0 |
 | 08 | **BSA §63 certificate** | Pre-populated Part A + eSakshya envelope | Run verifier |
 | 09 | **Verifier report** | Proven / asserted / unverifiable | Return to standby |
+| 10 | **Handoff** | What leaves the device, and what witnessing it actually buys | Export, then share |
 
 ### 01 Standby
 Opens on a **posture report**, not a camera. StrongBox availability, verified-boot state, patch
@@ -234,6 +235,26 @@ Three sections, equal visual weight, none collapsed behind a disclosure triangle
 
 > A verifier that only ever prints VALID ✓ teaches courts to over-trust it.
 
+### 10 Handoff
+Not an upload screen — the app has no `INTERNET` permission, so this writes a bundle and hands it to
+the share sheet.
+
+Three panels, in the order the questions get asked:
+
+- **Chain** — records sealed, how far the chain is witnessed off-device, and the **fabrication
+  window** as a count of unwitnessed records. The window is the honest number: a signature proves
+  who, the chain proves order, neither proves *when*.
+- **What the bundle contains** — one line per file type, with the `.ftr` named as the evidence and
+  everything else named as derived.
+- **Not claimed** — upload to CCTNS-2.0 and a countersigned timestamp, both marked NOT IMPLEMENTED
+  in the same red used for a failure, not greyed out as though pending.
+
+> A screen that says "Synced ✓" when it wrote a file to local storage is the same lie as a verifier
+> that only prints VALID. The chip reads `3 unwitnessed`, never `Ready`.
+
+Rule 8 applies here in its strongest form: an export receipt is a *weaker* anchor than a
+timestamping authority, and the screen says so rather than letting the green chip imply otherwise.
+
 ---
 
 ## 4. Interaction and accessibility
@@ -250,9 +271,8 @@ Three sections, equal visual weight, none collapsed behind a disclosure triangle
 ## 5. What the prototype does not yet cover
 
 1. Onboarding and device enrolment (key generation, card registration).
-0. The second-view screen (03b) is specified above but not built.
 2. Multi-sample sessions — several strips from one seizure under one memo.
-3. Anchor-reconnect flow and its conflict states.
+3. Conflict states when a bundle is ingested twice, or ingested out of order.
 4. Withdrawal/annotation UI for record 07.
 5. Settings, including the α risk level — likely a policy-locked value, not an operator control.
 6. Hindi and regional-language strings. Every string in the prototype is written to be translatable;
@@ -260,6 +280,9 @@ Three sections, equal visual weight, none collapsed behind a disclosure triangle
 
 ## 6. Handoff
 
-Build order matches `ARCHITECTURE.md` §11 track D. Screens 03 → 05 → 06 are the demo spine and
-should be built first; 01, 02, 07 are conventional and can follow. 08 and 09 need track E's statute
-work before their labels are final.
+Build order matched `ARCHITECTURE.md` §11 track D: 03 → 05 → 06 as the demo spine, then 01, 02, 07,
+then 08 and 09 once track E's statute work landed. **All ten are built.** Screen 10 came last
+because it is the only one whose content depends on what the ledger can actually prove, and that
+was not settled until anchoring was.
+
+What the bundle contains, and why exporting is what anchors, is in [`LEDGER.md`](LEDGER.md).
