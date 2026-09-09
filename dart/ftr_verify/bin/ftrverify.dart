@@ -7,7 +7,7 @@ library;
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:ftr_verify/src/verifier.dart';
+import 'package:ftr_verify/ftr_verify_io.dart';
 
 void main(List<String> argv) {
   if (argv.length < 2) {

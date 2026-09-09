@@ -6,7 +6,7 @@
 ///   canonical CBOR   deterministic encoding — the digest is the legal artefact
 ///   record           envelope parsing, digest recomputation, signature check
 ///   seal             building and sealing a record on the device
-///   verifier         proven / asserted / unverifiable
+///   verifier         proven / asserted / unverifiable (no dart:io — runs on web)
 ///   colorimetry      L1 device transform and L2 conformal abstention
 ///
 /// See README.md for what "independent implementation" means here, and
@@ -18,4 +18,4 @@ export 'src/colorimetry.dart';
 export 'src/record.dart' show SealedRecord, sha256, hex, bytesEqual, genesisHash;
 export 'src/seal.dart'
     show Attestation, Keystore, SoftwareKeystore, buildBody, seal, toEnvelope, schemaVersion;
-export 'src/verifier.dart' show Report, verifyRecord, verifyChain;
+export 'src/verifier.dart' show Report, verifyRecord;

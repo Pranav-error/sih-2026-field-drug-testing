@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:field_companion/src/models.dart';
+import 'package:field_companion/main.dart';
 import 'package:field_companion/src/screens.dart';
 import 'package:field_companion/src/tokens.dart';
 import 'package:field_companion/src/widgets.dart';
@@ -231,6 +232,7 @@ void main() {
   });
 
   _fontRules();
+  _responsiveRules();
   _livenessRules();
 
   group('accessibility', () {
@@ -375,6 +377,56 @@ void _livenessRules() {
     test('ten millimetres is enough — the screen must not imply precision', () {
       expect(SecondView.enoughMm, 10.0);
       expect(const SecondView(baselineMm: 10.0, cardVisible: true).ready, isTrue);
+    });
+  });
+}
+
+/// The app targets an issued handset, but it is demoed in a desktop browser.
+///
+/// The capture viewfinder is a 3:4 box. Unconstrained on a 2000px-wide window it
+/// becomes ~2600px tall, pushing the quality meters and the shutter off screen —
+/// the app looks frozen when it is only enormous. This is a real bug found by
+/// running the web build, not a hypothetical.
+void _responsiveRules() {
+  group('the app stays usable on a wide screen', () {
+    testWidgets('a desktop window renders a phone-width column, not a stretched one',
+        (t) async {
+      await t.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+
+      await t.pumpWidget(wrap(const PhoneFrame(child: StandbyScreen(posture: goodPosture))));
+      await t.pumpAndSettle();
+
+      final w = t.getSize(find.byType(Scaffold).first).width;
+      expect(w, lessThanOrEqualTo(PhoneFrame.width + 1),
+          reason: 'the UI must not stretch to the full window width');
+    });
+
+    testWidgets('the whole capture screen fits without overflowing', (t) async {
+      await t.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+
+      const good = CaptureQuality(
+          fiducialsFound: 4, illumination: 0.96, focus: 0.94,
+          tiltDegrees: 3, clippedFraction: 0);
+      await t.pumpWidget(wrap(const PhoneFrame(child: CaptureScreen(quality: good))));
+      await t.pumpAndSettle();
+
+      // The shutter is the thing that ends up off screen when this breaks.
+      // A RenderFlex overflow fails the test on its own, so reaching the
+      // shutter at all is the assertion.
+      expect(find.text('Capture frame'), findsOneWidget);
+    });
+
+    testWidgets('an actual phone viewport is left alone', (t) async {
+      await t.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+
+      await t.pumpWidget(wrap(const PhoneFrame(child: StandbyScreen(posture: goodPosture))));
+      await t.pumpAndSettle();
+
+      final w = t.getSize(find.byType(Scaffold).first).width;
+      expect(w, 390, reason: 'on a real handset the app fills the screen');
     });
   });
 }

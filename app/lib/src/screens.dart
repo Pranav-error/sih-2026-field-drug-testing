@@ -2,10 +2,13 @@
 /// arrives from the record layer, and none is computed in a widget.
 library;
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import 'models.dart';
 import 'tokens.dart';
+import 'viewfinder.dart';
 import 'widgets.dart';
 
 /// Screen 01 — the device states its own trustworthiness before it is used.
@@ -77,42 +80,45 @@ class StandbyScreen extends StatelessWidget {
 /// The shutter arms only when the frame is measurable. A bad frame produces a
 /// confident wrong answer in exactly the conditions where that does most damage.
 class CaptureScreen extends StatelessWidget {
-  const CaptureScreen({super.key, required this.quality, this.onCapture});
+  const CaptureScreen({
+    super.key,
+    required this.quality,
+    this.onCapture,
+    this.onFrame,
+    this.measured = false,
+    this.cardResidual,
+  });
 
   final CaptureQuality quality;
   final VoidCallback? onCapture;
+  final Future<void> Function(Uint8List)? onFrame;
+
+  /// True once the real pipeline is answering, so the panel can stop saying the
+  /// numbers are placeholders — because they no longer are.
+  final bool measured;
+  final double? cardResidual;
 
   @override
   Widget build(BuildContext context) {
-    final locked = quality.locked;
+    // When a real measurement is present the caller has already applied the
+    // pipeline's own gate, so an armed shutter is signalled by onCapture being
+    // non-null. Duplicating the thresholds here would let the UI and the record
+    // disagree about whether a frame was usable.
+    final locked = measured ? onCapture != null : quality.locked;
     return _Scaffold(
       title: 'Frame the card',
+      step: 1,
       chip: StateChip(locked ? 'Locked' : 'Aligning',
           colour: locked ? Tokens.negative : Tokens.abstain,
           soft: locked ? Tokens.negativeSoft : Tokens.abstainSoft),
       body: [
-        AspectRatio(
-          aspectRatio: 3 / 4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF16131F),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.bottomLeft,
-            padding: const EdgeInsets.all(10),
-            child: Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(quality.guidance,
-                  style: const TextStyle(color: Color(0xFFEDEAF4), fontSize: 12.5)),
-            ),
-          ),
-        ),
+        Viewfinder(guidance: quality.guidance, locked: locked, onFrame: onFrame),
         const SizedBox(height: 12),
-        Panel(title: 'Live capture quality', children: [
+        Panel(
+            title: measured
+                ? 'Live capture quality — measured'
+                : 'Capture quality — not yet measured',
+            children: [
           Measured('Fiducial lock', '${quality.fiducialsFound}/4',
               tone: quality.fiducialsFound == 4 ? Tokens.negative : Tokens.abstain),
           Measured('Illumination', '${(quality.illumination * 100).round()}%',
@@ -121,6 +127,22 @@ class CaptureScreen extends StatelessWidget {
           Measured('Card angle', '${quality.tiltDegrees.round()}°', limit: '25°'),
           Measured('Clipped', '${(quality.clippedFraction * 100).toStringAsFixed(1)}%',
               limit: '2.0%'),
+          if (measured && cardResidual != null)
+            Measured('Card residual', '${cardResidual!.toStringAsFixed(2)} dE',
+                limit: '3.00',
+                tone: cardResidual! <= 3 ? Tokens.negative : Tokens.positive),
+          const SizedBox(height: 6),
+          // Rule 8 again: never let a live picture imply a live measurement.
+          Text(
+            measured
+                ? 'These are real measurements of the frame in front of the '
+                    'camera, from the same pipeline the verifier re-runs.'
+                : 'The camera is live, but these figures are placeholders. Start '
+                    'the measure bridge to get real ones.',
+            style: TextStyle(
+                fontSize: 11, height: 1.4,
+                color: measured ? Tokens.muted : Tokens.abstain),
+          ),
         ]),
       ],
       footer: [
@@ -143,39 +165,62 @@ class CaptureScreen extends StatelessWidget {
 /// asks the operator to move a few centimetres, without explaining stereo
 /// geometry to somebody standing in the sun wearing gloves.
 class SecondViewScreen extends StatelessWidget {
-  const SecondViewScreen({super.key, required this.view, this.onCapture});
+  const SecondViewScreen({
+    super.key,
+    required this.view,
+    this.onCapture,
+    this.onFrame,
+    this.busy = false,
+  });
 
   final SecondView view;
   final VoidCallback? onCapture;
+  final Future<void> Function(Uint8List)? onFrame;
+
+  /// True while the two-view check is running on the pair.
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return _Scaffold(
       title: 'Second view',
+      step: 2,
       chip: StateChip(view.ready ? 'Far enough' : 'Keep moving',
           colour: view.ready ? Tokens.negative : Tokens.abstain,
           soft: view.ready ? Tokens.negativeSoft : Tokens.abstainSoft),
       body: [
-        AspectRatio(
-          aspectRatio: 3 / 4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF16131F),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.bottomLeft,
-            padding: const EdgeInsets.all(10),
-            child: Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(view.guidance,
-                  style: const TextStyle(color: Color(0xFFEDEAF4), fontSize: 12.5)),
-            ),
+        // Without this the second viewfinder is indistinguishable from the
+        // first, and taking a frame reads as having gone backwards.
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+          decoration: BoxDecoration(
+            color: Tokens.negativeSoft,
+            border: Border.all(color: Tokens.negative),
+            borderRadius: BorderRadius.circular(5),
           ),
+          child: Row(children: [
+            const Icon(Icons.check_circle, size: 17, color: Tokens.negative),
+            const SizedBox(width: 8),
+            Expanded(
+              child: RichText(
+                text: const TextSpan(
+                  style: TextStyle(fontSize: 12.5, height: 1.4, color: Tokens.ink2),
+                  children: [
+                    TextSpan(
+                        text: 'First frame captured. ',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: Tokens.negative)),
+                    TextSpan(text: 'Now move a few centimetres and take a second '
+                        'one — that is what proves the card was really there.'),
+                  ],
+                ),
+              ),
+            ),
+          ]),
         ),
+        Viewfinder(guidance: view.guidance, locked: view.ready, onFrame: onFrame),
         const SizedBox(height: 12),
         Panel(title: 'Movement', children: [
           // Deliberately not a number in millimetres: the operator cannot act on
@@ -203,8 +248,11 @@ class SecondViewScreen extends StatelessWidget {
         ),
       ],
       footer: [
-        PrimaryButton(view.ready ? 'Capture second frame' : 'Move a little further',
-            onPressed: view.ready ? onCapture : null),
+        PrimaryButton(
+            busy
+                ? 'Checking both frames…'
+                : (view.ready ? 'Capture second frame' : 'Move a little further'),
+            onPressed: (view.ready && !busy) ? onCapture : null),
         const SizedBox(height: 8),
         const Text('Both frames are hashed into the record. The second one is '
             'evidence too.',
@@ -371,12 +419,16 @@ class _Scaffold extends StatelessWidget {
     required this.chip,
     required this.body,
     this.footer = const [],
+    this.step,
   });
 
   final String title;
   final Widget chip;
   final List<Widget> body;
   final List<Widget> footer;
+
+  /// Which of the two capture frames this is, when it is one of them.
+  final int? step;
 
   @override
   Widget build(BuildContext context) {
@@ -385,9 +437,21 @@ class _Scaffold extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Tokens.surface,
         surfaceTintColor: Colors.transparent,
-        title: Text(title,
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w600, color: Tokens.ink)),
+        // Flexible, because the app bar also carries a state chip and a step
+        // counter: an unconstrained Row here overflows on a narrow handset.
+        title: Row(children: [
+          Flexible(
+            child: Text(title,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600, color: Tokens.ink)),
+          ),
+          if (step != null) ...[
+            const SizedBox(width: 7),
+            Text('$step/2', style: Tokens.monoStyle(
+                size: 11, weight: FontWeight.w600, colour: Tokens.muted)),
+          ],
+        ]),
         actions: [Padding(padding: const EdgeInsets.only(right: 14), child: Center(child: chip))],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),

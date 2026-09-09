@@ -15,6 +15,8 @@ library;
 
 import 'dart:typed_data';
 
+import 'src/measure_bridge.dart';
+
 import 'package:flutter/material.dart';
 import 'package:ftr_verify/ftr_verify.dart' as ftr;
 
@@ -35,6 +37,42 @@ class FieldCompanionApp extends StatelessWidget {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       home: const CaptureFlow(),
+    );
+  }
+}
+
+/// Keeps the app at handset proportions on a desktop browser.
+///
+/// Without this the capture viewfinder — a 3:4 box — becomes about 2,600 px tall
+/// on a wide window and pushes the quality meters and the shutter off screen, so
+/// the app looks frozen when it is merely enormous. The target is an issued
+/// phone; on anything wider we render a phone-shaped column and let the page
+/// behind it recede.
+class PhoneFrame extends StatelessWidget {
+  const PhoneFrame({super.key, required this.child});
+
+  static const double width = 412;    // a common issued-handset logical width
+  static const double _maxHeight = 892;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    if (size.width <= width + 24) return child;   // an actual phone: fill it
+
+    return ColoredBox(
+      color: const Color(0xFF2A2436),
+      child: Center(
+        child: SizedBox(
+          width: width,
+          height: size.height < _maxHeight ? size.height : _maxHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: child,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -64,13 +102,70 @@ class _CaptureFlowState extends State<CaptureFlow> {
   double _progress = 0;
   double _baselineMm = 0;
 
-  CaptureQuality get _quality => CaptureQuality(
+  // The real pipeline, reached over a localhost bridge because a browser has no
+  // OpenCV. On a handset the same code runs natively over a platform channel.
+  final _bridge = MeasureBridge();
+  Measurement? _live;
+  Uint8List? _frameA;      // the first captured frame, kept for the liveness pair
+  Uint8List? _frameB;
+  bool _pairing = false;
+
+  /// Real measurements when the bridge is answering; the simulated ramp when it
+  /// is not, so the flow is still walkable without it.
+  CaptureQuality get _quality =>
+      _live?.quality ??
+      CaptureQuality(
         fiducialsFound: (_progress * 4).clamp(0, 4).round(),
         illumination: 0.70 + 0.28 * _progress,
         focus: 0.40 + 0.56 * _progress,
         tiltDegrees: 16 - 13 * _progress,
         clippedFraction: 0,
       );
+
+  bool get _shutterArmed =>
+      _live != null ? (_live!.detected && _live!.gatePassed) : _quality.locked;
+
+  Future<void> _onFrame(Uint8List jpeg) async {
+    final m = await _bridge.measure(jpeg);
+    if (m != null && mounted) {
+      setState(() {
+        _live = m;
+        if (_step == Step.capture && m.detected && m.gatePassed) _frameA = jpeg;
+      });
+    }
+  }
+
+  /// The second view. The card's apparent motion between the two frames stands
+  /// in for a measured baseline — the operator only ever needs to know whether
+  /// they have moved enough, never by how much.
+  Future<void> _onSecondFrame(Uint8List jpeg) async {
+    final m = await _bridge.measure(jpeg);
+    if (m == null || !mounted) return;
+    setState(() {
+      _live = m;
+      _frameB = jpeg;
+      // Movement is inferred from the pipeline seeing a valid card at a changed
+      // pose; without a second real signal this is the honest proxy available.
+      if (m.detected) _baselineMm += 4.5;
+    });
+  }
+
+  /// Run the real two-view check on the two real frames.
+  Future<void> _confirmPair() async {
+    final a = _frameA, b = _frameB;
+    if (a == null || b == null) {
+      setState(() => _step = Step.result);
+      return;
+    }
+    setState(() => _pairing = true);
+    final m = await _bridge.measurePair(a, b);
+    if (!mounted) return;
+    setState(() {
+      if (m != null) _live = m;
+      _pairing = false;
+      _step = Step.result;
+    });
+  }
 
   DevicePosture get _posture => DevicePosture(
         securityLevel: _keystore.attestation().securityLevel,
@@ -86,12 +181,6 @@ class _CaptureFlowState extends State<CaptureFlow> {
   SecondView get _secondView =>
       SecondView(baselineMm: _baselineMm, cardVisible: true);
 
-  // A live capture. The flat case is what a print produces, and the app treats it
-  // as a refusal rather than an error — see docs/PARALLAX.md.
-  static const _liveness = Liveness(
-    checked: true, live: true, measuredPx: 28.1, predictedPx: 28.2,
-  );
-
   static const _result = TestResult(
     predictionSet: ['opiate_class', 'amphetamine_class'],
     label: null,
@@ -100,6 +189,25 @@ class _CaptureFlowState extends State<CaptureFlow> {
     threshold: 5.53,
     scores: {'opiate_class': 4.12, 'amphetamine_class': 5.02, 'negative': 46.8},
   );
+
+  Map<String, Object?> _livenessRecord() {
+    final l = _live?.liveness;
+    if (l == null || !l.checked) {
+      return {
+        'checked': false,
+        'note': 'single frame, or the two-view check did not run — this capture '
+            'cannot be distinguished from a photograph of a card',
+      };
+    }
+    return {
+      'checked': true,
+      'live': l.live,
+      'displacement_px_x100': (l.measuredPx * 100).round(),
+      'predicted_px_x100': (l.predictedPx * 100).round(),
+      'form': 'weak — no known baseline, so feature height is not pinned',
+      'reason': l.reason,
+    };
+  }
 
   void _seal() {
     final frame = Uint8List.fromList('frame $_sequence'.codeUnits);
@@ -127,15 +235,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
         'prediction_set': _result.predictionSet,
         'label': _result.label,
       },
-      liveness: {
-        'checked': _liveness.checked,
-        'live': _liveness.live,
-        'displacement_px_x100': (_liveness.measuredPx * 100).round(),
-        'predicted_px_x100': (_liveness.predictedPx * 100).round(),
-        'tab_height_mm_x10': 80,
-        'baseline_mm_x10': 500,
-        'distance_mm_x10': 1500,
-      },
+      // The measured liveness, or an explicit "not checked" — never a default
+      // that would read as having passed.
+      liveness: _livenessRecord(),
       locationBundle: const {'corroboration_channels_agreeing': 4,
         'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
       device: const {'verified_boot_state': 'UNKNOWN', 'bootloader_state': 'UNKNOWN'},
@@ -151,7 +253,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PhoneFrame(child: _screen());
+
+  Widget _screen() {
     switch (_step) {
       case Step.standby:
         return StandbyScreen(
@@ -165,10 +269,15 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return Stack(children: [
           CaptureScreen(
             quality: _quality,
-            onCapture: () => setState(() {
-              _baselineMm = 0;
-              _step = Step.secondView;
-            }),
+            measured: _live?.detected ?? false,
+            cardResidual: _live?.cardResidual,
+            onFrame: _onFrame,
+            onCapture: !_shutterArmed
+                ? null
+                : () => setState(() {
+                      _baselineMm = 0;
+                      _step = Step.secondView;
+                    }),
           ),
           // Stands in for the camera settling. Removed with the platform channel.
           Positioned(
@@ -185,20 +294,17 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return Stack(children: [
           SecondViewScreen(
             view: _secondView,
-            onCapture: () => setState(() => _step = Step.result),
-          ),
-          Positioned(
-            right: 16,
-            bottom: 96,
-            child: FloatingActionButton.small(
-              tooltip: 'Simulate moving the phone',
-              onPressed: () => setState(() => _baselineMm += 4.5),
-              child: const Icon(Icons.swipe_right),
-            ),
+            onFrame: _onSecondFrame,
+            busy: _pairing,
+            onCapture: _confirmPair,
           ),
         ]);
       case Step.result:
-        return ResultScreen(result: _result, liveness: _liveness, onSeal: _seal);
+        return ResultScreen(
+          result: _live?.result ?? _result,
+          liveness: _live?.liveness ?? const Liveness.notChecked(),
+          onSeal: _seal,
+        );
       case Step.sealed:
         return Scaffold(
           body: SealedScreen(

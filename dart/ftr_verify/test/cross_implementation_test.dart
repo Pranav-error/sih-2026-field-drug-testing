@@ -14,9 +14,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:ftr_verify/src/canonical_cbor.dart' as cbor;
-import 'package:ftr_verify/src/record.dart';
-import 'package:ftr_verify/src/seal.dart' show SoftwareKeystore, toEnvelope, seal;
-import 'package:ftr_verify/src/verifier.dart';
+import 'package:ftr_verify/ftr_verify_io.dart';
 import 'package:test/test.dart';
 
 final vectors = Directory('test/vectors');

@@ -26,6 +26,12 @@ class CaptureQuality {
     required this.clippedFraction,
   });
 
+  /// True when the frame is measurable.
+  ///
+  /// When a real measurement is available the pipeline's own gate decides —
+  /// duplicating its thresholds here would let the UI and the record disagree
+  /// about whether a frame was usable, which is the last thing this system
+  /// should do. These values are the fallback for the simulated path.
   bool get locked =>
       fiducialsFound == 4 &&
       illumination >= 0.85 &&
