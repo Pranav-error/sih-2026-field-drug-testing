@@ -13,16 +13,23 @@
 ///  * any way to edit or delete a sealed record.
 library;
 
-import 'dart:typed_data';
 
 import 'src/measure_bridge.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ftr_verify/ftr_verify.dart' as ftr;
 
 import 'src/models.dart';
 import 'src/screens.dart';
 import 'src/tokens.dart';
+
+/// Run the two-view check in a background isolate.
+///
+/// It searches a grid of offsets over two rectified regions and would visibly
+/// stall the capture screen on the UI thread.
+Measurement? _pairInIsolate(List<Uint8List> frames) =>
+    OnDeviceMeasurer().measurePair(frames[0], frames[1]);
 
 void main() => runApp(const FieldCompanionApp());
 
@@ -102,9 +109,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
   double _progress = 0;
   double _baselineMm = 0;
 
-  // The real pipeline, reached over a localhost bridge because a browser has no
-  // OpenCV. On a handset the same code runs natively over a platform channel.
-  final _bridge = MeasureBridge();
+  // The pipeline, running on this device in pure Dart. No network, no laptop,
+  // no native dependency — which is what lets an APK work in a room on its own.
+  final _measurer = OnDeviceMeasurer();
   Measurement? _live;
   Uint8List? _frameA;      // the first captured frame, kept for the liveness pair
   Uint8List? _frameB;
@@ -126,7 +133,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       _live != null ? (_live!.detected && _live!.gatePassed) : _quality.locked;
 
   Future<void> _onFrame(Uint8List jpeg) async {
-    final m = await _bridge.measure(jpeg);
+    final m = _measurer.measure(jpeg);
     if (m != null && mounted) {
       setState(() {
         _live = m;
@@ -139,7 +146,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
   /// in for a measured baseline — the operator only ever needs to know whether
   /// they have moved enough, never by how much.
   Future<void> _onSecondFrame(Uint8List jpeg) async {
-    final m = await _bridge.measure(jpeg);
+    final m = _measurer.measure(jpeg);
     if (m == null || !mounted) return;
     setState(() {
       _live = m;
@@ -158,7 +165,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
       return;
     }
     setState(() => _pairing = true);
-    final m = await _bridge.measurePair(a, b);
+    // Off the UI thread: the two-view search is the heaviest thing the app does.
+    final m = await compute(_pairInIsolate, [a, b]);
     if (!mounted) return;
     setState(() {
       if (m != null) _live = m;
@@ -238,6 +246,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
       // The measured liveness, or an explicit "not checked" — never a default
       // that would read as having passed.
       liveness: _livenessRecord(),
+      // Which implementation produced these numbers. A verifier re-running the
+      // reference pipeline needs to know why the last digit may differ.
+      pipelineName: 'dart-on-device',
       locationBundle: const {'corroboration_channels_agreeing': 4,
         'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
       device: const {'verified_boot_state': 'UNKNOWN', 'bootloader_state': 'UNKNOWN'},

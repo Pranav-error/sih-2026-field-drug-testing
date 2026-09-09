@@ -1,8 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The card and the strip are photographed together; the camera is the
+         instrument. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Reaching the measure bridge on a laptop over the local network. The real
+         architecture runs L1/L2 natively on-device and needs neither of these;
+         this is the demo path until that native pipeline exists. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
     <application
-        android:label="field_companion"
+        android:label="Field Companion"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

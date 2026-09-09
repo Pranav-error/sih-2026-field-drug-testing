@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   crypto: ^3.0.0          # SHA-256 — deliberately not the same library Python uses
+  image: ^4.9.2
   pointycastle: ^3.9.1    # ECDSA P-256
 
 dev_dependencies:

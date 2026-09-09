@@ -14,7 +14,13 @@
 library;
 
 export 'src/canonical_cbor.dart' show encode, decode, isCanonical, CborError;
+export 'src/card.dart' show CardSpec, cardV1, pxPerMm;
 export 'src/colorimetry.dart';
+export 'src/detect.dart'
+    show Gray, Quad, DartDetection, toGray, adaptiveThreshold, findFiducials,
+        orderMarkers, homographyFrom, applyHomography, tiltFrom;
+export 'src/pipeline.dart'
+    show Quality, DeviceMeasurement, DeviceLiveness, measureOnDevice, livenessOnDevice;
 export 'src/record.dart' show SealedRecord, sha256, hex, bytesEqual, genesisHash;
 export 'src/seal.dart'
     show Attestation, Keystore, SoftwareKeystore, buildBody, seal, toEnvelope, schemaVersion;

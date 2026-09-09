@@ -225,15 +225,43 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def lan_address() -> str | None:
+    """This machine's address on the local network.
+
+    A phone running the APK cannot reach 127.0.0.1 — that is the phone. For a
+    team demo the bridge has to be reachable across the room, so print the
+    address people actually need rather than making them find it.
+    """
+    import socket
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))   # no packets sent; picks the route
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def main() -> int:
     port = 8824
+    lan = lan_address()
     print(f"measure bridge on http://127.0.0.1:{port}")
+    if lan:
+        print(f"  on this network:   http://{lan}:{port}/")
+        print("  put that address into the app on a phone (Change pipeline address)")
+    else:
+        print("  no local network address found — phones will not reach this")
     print(f"  card    {CARD_V1.card_id_prefix}, {CARD_V1.n_patches} patches, "
           f"{len(CARD_V1.marker_ids)} fiducials")
     print(f"  classes {', '.join(sorted(LOCI))}")
     print(f"  alpha   {CLASSIFIER.alpha}  threshold {CLASSIFIER.threshold:.2f} dE")
     print("  running the same ftr.pipeline the tests and the verifier use")
-    HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    # 0.0.0.0 so phones on the same network can reach it. Localhost-only would
+    # make the APK demo impossible. No auth: this is a demo rig on a trusted
+    # network, and it must never be exposed beyond one.
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
     return 0
 
 

@@ -148,6 +148,7 @@ Map<String, Object?> buildBody({
   required Map<String, Object?> colorimetry,
   required Map<String, Object?> classification,
   Map<String, Object?> liveness = const {'checked': false},
+  String pipelineName = 'reference',
   required Map<String, Object?> locationBundle,
   required Map<String, Object?> device,
   Map<String, Object?> ndps = const {},
@@ -171,6 +172,10 @@ Map<String, Object?> buildBody({
     // Peer of colorimetry and classification: whether the scene was physically
     // present is a finding about the test, not a property of an image file.
     'liveness': liveness,
+    // Which implementation measured this. The on-device Dart pipeline uses
+    // coarser corner detection than the reference, so a verifier re-deriving
+    // the result knows what tolerance to expect.
+    'pipeline': pipelineName,
     'classification': classification,
     'location_bundle': locationBundle,
     'device': device,

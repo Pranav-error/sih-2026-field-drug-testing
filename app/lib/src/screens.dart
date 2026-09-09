@@ -17,10 +17,23 @@ import 'widgets.dart';
 /// challenge asks is not what the strip looked like; it is what kind of machine
 /// was holding the camera.
 class StandbyScreen extends StatelessWidget {
-  const StandbyScreen({super.key, required this.posture, this.onBegin});
+  const StandbyScreen({
+    super.key,
+    required this.posture,
+    this.onBegin,
+    this.bridgeEndpoint,
+    this.bridgeReachable,
+    this.onEditBridge,
+  });
 
   final DevicePosture posture;
   final VoidCallback? onBegin;
+
+  /// Retained so the web build can still point at a bridge; the handset build
+  /// measures on-device and leaves these null.
+  final String? bridgeEndpoint;
+  final bool? bridgeReachable;
+  final VoidCallback? onEditBridge;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +64,18 @@ class StandbyScreen extends StatelessWidget {
                 'presented as evidence.',
           ),
         const SizedBox(height: 12),
+        Panel(title: 'Measurement pipeline', children: [
+          const Measured('Runs', 'On this device', tone: Tokens.negative),
+          const Measured('Network required', 'None', tone: Tokens.negative),
+          const Measured('Reference card', 'CARD-IN-2026'),
+          const SizedBox(height: 6),
+          const Text(
+            'Fiducial detection, the illumination fit, the colour transform and '
+            'the abstention threshold all run here, in Dart. Corner detection is '
+            'coarser than the reference implementation, and every record says so.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+          ),
+        ]),
         Panel(title: 'Record chain', tint: true, children: [
           Measured('Records on device', '${posture.recordCount}'),
           Measured('Awaiting anchor', '${posture.unanchored}',
