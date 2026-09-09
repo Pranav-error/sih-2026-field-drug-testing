@@ -25,12 +25,21 @@ No new hardware. A printed colour card and a phone.
 
 ---
 
+![Architecture](docs/slides/architecture.png)
+
+*The system, organised by trust boundary rather than by component — who is being
+asked to believe what, and on whose word. Full-size and editable in
+[`docs/slides/`](docs/slides).*
+
 ## How it actually works
 
 A walk through one test, end to end. Every stage below is implemented; the gaps
 are marked where they exist.
 
 ### 1. The physical setup — no new hardware
+
+<img src="docs/reference-card.png" width="380" align="right" alt="The reference card">
+
 
 An officer has the reagent kit the department already buys, and one **printed
 reference card**: matte A4, four ArUco fiducials at the corners, 15 colour patches
@@ -248,7 +257,8 @@ None is a field accuracy.** No printed card has been photographed. See
 | **F** — data | **Not started, and it is the critical path.** Card is printable, ingest tooling and protocol are built. It needs a person, a printer and a weekend. |
 
 Two tasks now gate the submission and **neither is code**: compare the §63 Schedule
-against the Gazette, and run the capture matrix.
+against the Gazette, and run the capture matrix. Both are specified in
+[`DATA-NEEDED.md`](docs/DATA-NEEDED.md).
 
 ---
 
@@ -289,6 +299,8 @@ flagged, never recalled. → [`DETERMINISM.md`](docs/DETERMINISM.md)
 ## Documents
 
 **Design and argument**
+- [`TIMELINE.md`](docs/TIMELINE.md) — the build log: what was made, and what testing proved wrong
+- [`DATA-NEEDED.md`](docs/DATA-NEEDED.md) — **what we still need and how to get it**, plus what must not be attempted
 - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) — seven layers, the threat model, data strategy, build plan
 - [`NOVELTY.md`](docs/NOVELTY.md) — prior art conceded, what survives it, the §3(k) problem
 - [`DESIGN.md`](docs/DESIGN.md) — interface spec: tokens, the seven rules every screen obeys
