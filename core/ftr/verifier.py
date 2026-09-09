@@ -275,10 +275,21 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
             "clock. Nothing here proves the clock was correct; only the chain and an "
             "anchor bound when this record was made."
         )
-    if body.get("operator", {}).get("biometric_unlock_used"):
+    operator = body.get("operator", {})
+    if operator.get("biometric_unlock_used"):
         r.asserted.append(
             "Key use was gated by a biometric. That binds the record to the enrolled "
             "device, not to the named person."
+        )
+    else:
+        r.asserted.append(
+            "Key use was NOT gated by a biometric. Nothing in this record connects it "
+            "to a person at all — only to the device that signed it."
+        )
+    if not operator.get("id"):
+        r.asserted.append(
+            "No operator credential was recorded. The record does not name who "
+            "performed the test."
         )
     kit = body.get("kit", {})
     if kit.get("reagent_type"):

@@ -584,7 +584,11 @@ neither the app nor us.
    pair reproduces the real parallax.
 5. **The attestation chain is not walked to a Google root.**
 6. **No GPS or mock-location detection in the app** — the location bundle is constant.
-7. **The 196 substrate probes are Python-only**, so the app runs a weaker light-field
+7. **The signing key is not gated behind a biometric**, and the record says so
+   rather than claiming one. Nothing connects a record to a person.
+8. **`card_id` and `print_batch` are hardcoded** in `main.dart` — the printed
+   card's serial is not read from the card.
+9. **The 196 substrate probes are Python-only**, so the app runs a weaker light-field
    check.
 
 ---

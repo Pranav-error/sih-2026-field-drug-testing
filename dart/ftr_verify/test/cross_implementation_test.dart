@@ -166,4 +166,64 @@ void main() {
       expect(report.unverifiable.any((u) => u.contains('physically present')), isTrue);
     });
   });
+
+  group('a genuine hardware record must not read as a modified device', () {
+    // Regression: PlatformKeystore reports verified boot as IN_ATTESTATION,
+    // because the authoritative value is inside the certificate and the app
+    // refuses to assert it. The verifier used to fall through to its "modified
+    // device" branch and FAIL every real StrongBox record — reading the app's
+    // honesty as evidence against it.
+    Uint8List sealHardware(String vbs, {int chainLen = 3}) {
+      final body = <String, Object?>{
+        'schema_version': 1,
+        'record_uuid': '00000000-0000-4000-d000-000000000001',
+        'sequence': 0,
+        'prev_record_hash': genesisHash,
+        'captured_at': {'device_clock': '2026-09-09T14:00:00+05:30'},
+        'operator': {'id': 'NCB/BLR/2291'},
+        'kit': {'reagent_type': 'marquis'},
+        'card': {'card_id': 'CARD-IN-2026-0417'},
+        'capture': <String, Object?>{},
+        'colorimetry': {'measured': true, 'gate_passed': true},
+        'liveness': {'checked': true, 'live': true,
+            'displacement_px_x100': 2810, 'predicted_px_x100': 400},
+        'classification': {'label': 'opiate_class', 'prediction_set': ['opiate_class']},
+        'location_bundle': <String, Object?>{},
+        'device': <String, Object?>{},
+        'ndps': <String, Object?>{},
+        'omitted': <String>[],
+      };
+      final rec = seal(body, SoftwareKeystore(seed: 11));
+      final att = Map<String, Object?>.from(rec.attestation)
+        ..['security_level'] = 'STRONGBOX'
+        ..['verified_boot_state'] = vbs
+        ..['bootloader_locked'] = false
+        ..['cert_chain'] = List.generate(
+            chainLen, (i) => Uint8List.fromList([0x30, 0x03, i]));
+      return cbor.encode({
+        'v': 1, 'body': rec.bodyCbor, 'sig': rec.signature,
+        'pub': rec.publicKeyDer, 'att': att,
+      });
+    }
+
+    test('IN_ATTESTATION is reported as asserted, never as a failure', () {
+      final report = verifyRecord(sealHardware('IN_ATTESTATION'));
+      expect(report.failures.any((f) => f.contains('modified device')), isFalse,
+          reason: 'the app declining to assert verified boot is honesty, not evidence '
+              'of tampering');
+      expect(report.asserted.any((a) => a.contains('attestation certificate')), isTrue);
+      expect(report.asserted.any((a) => a.contains('3 in the chain')), isTrue);
+    });
+
+    test('a genuinely bad boot state still fails', () {
+      final report = verifyRecord(sealHardware('ORANGE'));
+      expect(report.failures.any((f) => f.contains('modified device')), isTrue);
+    });
+
+    test('a supplied chain suppresses the no-attestation caveat', () {
+      final report = verifyRecord(sealHardware('IN_ATTESTATION'));
+      expect(report.asserted.any((a) => a.contains('No attestation certificate chain')),
+          isFalse);
+    });
+  });
 }

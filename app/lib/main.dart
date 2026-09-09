@@ -15,6 +15,8 @@ library;
 
 
 import 'src/measure_bridge.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+
 import 'src/certificate.dart';
 import 'src/platform_keystore.dart';
 import 'src/screens_extra.dart';
@@ -106,6 +108,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
   final _software = ftr.SoftwareKeystore();
   RecordStore? _store;
   String _reagent = 'Marquis';
+  String _operatorId = '';
+  Map<String, Object?> _deviceInfo = const {};
   String _fir = '';
   String _memo = '';
   Certificate? _certificate;
@@ -214,6 +218,28 @@ class _CaptureFlowState extends State<CaptureFlow> {
     super.initState();
     _openKeystore();
     _openStore();
+    _readDevice();
+  }
+
+  /// Make and model for the §63 certificate, which asks for them by name.
+  ///
+  /// Serial number and IMEI are **not** readable without privileged permissions
+  /// on any modern Android, so they stay absent and the certificate reports them
+  /// as fields the record cannot supply — which is the honest outcome, not a bug.
+  Future<void> _readDevice() async {
+    try {
+      final info = await DeviceInfoPlugin().androidInfo;
+      if (!mounted) return;
+      setState(() => _deviceInfo = {
+            'make_model': '${info.manufacturer} ${info.model}',
+            'os_patch_level': '${info.version.securityPatch}',
+            'android_release': info.version.release,
+            'hardware': info.hardware,
+          });
+    } catch (_) {
+      // Not Android, or the plugin is unavailable. The certificate then names
+      // make and model as missing rather than inventing them.
+    }
   }
 
   Future<void> _openStore() async {
@@ -290,7 +316,15 @@ class _CaptureFlowState extends State<CaptureFlow> {
       sequence: _store?.nextSequence ?? _sequence,
       prevRecordHash: _store?.head ?? _chainHead,
       capturedAt: {'device_clock': DateTime.now().toIso8601String()},
-      operator_: {'id': 'NCB/BLR/2291', 'biometric_unlock_used': true},
+      operator_: {
+        if (_operatorId.isNotEmpty) 'id': _operatorId,
+        // FALSE would be a lie if we claimed otherwise: the signing key is not
+        // created with setUserAuthenticationRequired, so nothing gates its use
+        // behind a fingerprint. Asserting a biometric that never happened is
+        // exactly the kind of claim this project exists to refuse.
+        'biometric_unlock_used': false,
+        'identified': _operatorId.isNotEmpty,
+      },
       kit: {'reagent_type': _reagent.toLowerCase()},
       card: {'card_id': 'CARD-IN-2026-0417', 'print_batch': 'B12'},
       capture: {
@@ -327,7 +361,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
       pipelineName: 'dart-on-device',
       locationBundle: const {'corroboration_channels_agreeing': 4,
         'corroboration_channels_total': 4, 'spoof_indicators': <String>[]},
-      device: const {'verified_boot_state': 'UNKNOWN', 'bootloader_state': 'UNKNOWN'},
+      // Verified boot and bootloader state are deliberately absent: they live in
+      // the attestation certificate, and the app must not assert them.
+      device: {..._deviceInfo, 'state_source': 'attestation certificate'},
     );
 
     // Hardware signing is asynchronous — the key is inside the secure element
@@ -385,6 +421,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return SetupScreen(
           reagent: _reagent,
           onReagent: (r) => setState(() => _reagent = r),
+          operatorId: _operatorId,
+          onOperator: (v) => _operatorId = v,
           firRef: _fir,
           memoRef: _memo,
           onFir: (v) => _fir = v,

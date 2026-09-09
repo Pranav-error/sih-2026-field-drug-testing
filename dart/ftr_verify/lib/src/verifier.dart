@@ -120,7 +120,19 @@ Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
 
   final vbs = att['verified_boot_state'] as String? ?? 'UNKNOWN';
   final locked = att['bootloader_locked'] == true;
-  if (vbs == 'GREEN' && locked) {
+  final chain = (att['cert_chain'] as List?) ?? const [];
+  if (vbs == 'IN_ATTESTATION') {
+    // The app deliberately refuses to assert verified boot: the authoritative
+    // value lives inside the attestation certificate, and a verifier taking the
+    // app's word for it would be trusting the software whose integrity is in
+    // question. This implementation does not parse that extension — the Python
+    // reference does — so it says so rather than guessing, and above all rather
+    // than reading the app's honesty as evidence of a modified device.
+    r.asserted.add('Verified boot state and bootloader lock are carried inside the '
+        'attestation certificate (${chain.length} in the chain), not in the record. '
+        'This implementation does not parse that extension; run the reference '
+        'verifier to read them.');
+  } else if (vbs == 'GREEN' && locked) {
     r.proven.add('Verified boot was GREEN and the bootloader locked when the key was '
         'attested: the device was running unmodified signed firmware.');
   } else if (vbs == 'UNKNOWN') {
@@ -130,7 +142,7 @@ Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
         '${locked ? 'locked' : 'unlocked'}. The record was produced on a modified device.');
   }
 
-  if ((att['cert_chain_len'] as int? ?? 0) == 0) {
+  if ((att['cert_chain_len'] as int? ?? 0) == 0 && chain.isEmpty) {
     r.asserted.add('No attestation certificate chain is present, so the hardware '
         'claims above cannot be traced to a root certificate authority.');
   }
@@ -192,10 +204,19 @@ Report verifyRecord(Uint8List blob, {Map<String, Uint8List>? images}) {
         'device clock. Nothing here proves the clock was correct; only the chain and '
         'an anchor bound when this record was made.');
   }
-  final op = body['operator'];
-  if (op is Map && op['biometric_unlock_used'] == true) {
+  final op = (body['operator'] as Map?) ?? const {};
+  if (op['biometric_unlock_used'] == true) {
     r.asserted.add('Key use was gated by a biometric. That binds the record to the '
         'enrolled device, not to the named person.');
+  } else {
+    // Silence would read as a pass. It does not: an ungated key means nothing
+    // in this record connects it to a person.
+    r.asserted.add('Key use was NOT gated by a biometric. Nothing in this record '
+        'connects it to a person at all — only to the device that signed it.');
+  }
+  if (op['id'] == null || '${op['id']}'.isEmpty) {
+    r.asserted.add('No operator credential was recorded. The record does not name '
+        'who performed the test.');
   }
   final kit = body['kit'];
   if (kit is Map && kit['reagent_type'] != null) {

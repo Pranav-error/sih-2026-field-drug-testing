@@ -30,6 +30,8 @@ class SetupScreen extends StatelessWidget {
     super.key,
     required this.reagent,
     required this.onReagent,
+    required this.operatorId,
+    required this.onOperator,
     required this.firRef,
     required this.memoRef,
     required this.onFir,
@@ -39,6 +41,8 @@ class SetupScreen extends StatelessWidget {
 
   final String reagent;
   final ValueChanged<String> onReagent;
+  final String operatorId;
+  final ValueChanged<String> onOperator;
   final String firRef;
   final String memoRef;
   final ValueChanged<String> onFir;
@@ -82,6 +86,17 @@ class SetupScreen extends StatelessWidget {
             'Declared by you, not read from the kit. The system works with '
             'whatever reagent the department already buys — no serialised pouch, '
             'no vendor lock-in.',
+            style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
+          ),
+        ]),
+        Panel(title: 'Operator', children: [
+          _Field(label: 'Credential reference', value: operatorId,
+              onChanged: onOperator, hint: 'NCB/BLR/2291'),
+          const SizedBox(height: 8),
+          const Text(
+            'Recorded as declared. The signing key is not gated behind a '
+            'biometric in this build, so the record does not claim one — it '
+            'binds to the device, never to a person.',
             style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
           ),
         ]),
