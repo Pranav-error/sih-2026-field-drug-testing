@@ -297,6 +297,25 @@ class _CaptureFlowState extends State<CaptureFlow> {
             onFrame: _onSecondFrame,
             busy: _pairing,
             onCapture: _confirmPair,
+            onSkip: () => setState(() {
+              // Drop the pair so _livenessRecord() reports "not checked" rather
+              // than a stale verdict from the live preview.
+              _frameB = null;
+              _live = _live == null
+                  ? null
+                  : Measurement(
+                      detected: _live!.detected,
+                      fiducials: _live!.fiducials,
+                      guidance: _live!.guidance,
+                      gatePassed: _live!.gatePassed,
+                      refusals: _live!.refusals,
+                      quality: _live!.quality,
+                      lab: _live!.lab,
+                      cardResidual: _live!.cardResidual,
+                      result: _live!.result,
+                    );
+              _step = Step.result;
+            }),
           ),
         ]);
       case Step.result:

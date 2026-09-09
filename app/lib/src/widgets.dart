@@ -123,15 +123,39 @@ class PresumptiveNotice extends StatelessWidget {
 /// Primary action. Disabled state is a real state: a blocked shutter is a rude
 /// interaction and the correct one.
 class PrimaryButton extends StatelessWidget {
-  const PrimaryButton(this.label, {super.key, this.onPressed, this.tone});
+  const PrimaryButton(this.label, {super.key, this.onPressed, this.tone})
+      : ghosted = false;
+
+  /// A secondary action, offered at lower visual weight but never hidden. Used
+  /// where a rule can be stepped around and the record notes that it was.
+  const PrimaryButton.ghost(this.label, {super.key, this.onPressed})
+      : tone = null,
+        ghosted = true;
 
   final String label;
   final VoidCallback? onPressed;
   final Color? tone;
+  final bool ghosted;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
+    if (ghosted) {
+      return SizedBox(
+        width: double.infinity,
+        height: Tokens.touchTarget,
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: enabled ? Tokens.ink2 : Tokens.muted,
+            side: const BorderSide(color: Tokens.rule),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+          ),
+          child: Text(label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        ),
+      );
+    }
     return SizedBox(
       width: double.infinity,
       height: Tokens.touchTarget,

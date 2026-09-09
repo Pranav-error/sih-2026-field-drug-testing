@@ -170,12 +170,19 @@ class SecondViewScreen extends StatelessWidget {
     required this.view,
     this.onCapture,
     this.onFrame,
+    this.onSkip,
     this.busy = false,
   });
 
   final SecondView view;
   final VoidCallback? onCapture;
   final Future<void> Function(Uint8List)? onFrame;
+
+  /// Proceed on the first frame alone. Offered because field conditions are not
+  /// negotiable with software — but the record then says a liveness check was
+  /// not performed, and the verifier reports that it cannot be distinguished
+  /// from a photograph of a card. Skipping is allowed; hiding it is not.
+  final VoidCallback? onSkip;
 
   /// True while the two-view check is running on the pair.
   final bool busy;
@@ -254,10 +261,20 @@ class SecondViewScreen extends StatelessWidget {
                 : (view.ready ? 'Capture second frame' : 'Move a little further'),
             onPressed: (view.ready && !busy) ? onCapture : null),
         const SizedBox(height: 8),
-        const Text('Both frames are hashed into the record. The second one is '
-            'evidence too.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted)),
+        if (onSkip != null)
+          PrimaryButton.ghost('Continue with one frame only',
+              onPressed: busy ? null : onSkip),
+        const SizedBox(height: 8),
+        Text(
+          onSkip == null
+              ? 'Both frames are hashed into the record. The second one is '
+                  'evidence too.'
+              : 'Both frames are hashed into the record. Continuing with one '
+                  'records that no liveness check was performed — the result '
+                  'cannot then be told apart from a photograph of a card.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
+        ),
       ],
     );
   }

@@ -374,6 +374,31 @@ void _livenessRules() {
       expect(find.textContaining('evidence too'), findsOneWidget);
     });
 
+    testWidgets('a single-frame capture is offered, and says what it costs',
+        (t) async {
+      // Field conditions are not negotiable with software. The escape hatch is
+      // offered at lower weight and the consequence is stated, rather than the
+      // option being hidden and an officer improvising around it.
+      var skipped = false;
+      await t.pumpWidget(wrap(SecondViewScreen(
+        view: const SecondView(baselineMm: 2.0, cardVisible: true),
+        onSkip: () => skipped = true,
+      )));
+      expect(find.text('Continue with one frame only'), findsOneWidget);
+      expect(find.textContaining('cannot then be told apart from a photograph'),
+          findsOneWidget);
+      await t.tap(find.text('Continue with one frame only'));
+      expect(skipped, isTrue,
+          reason: 'the escape must work even before the operator has moved');
+    });
+
+    testWidgets('the single-frame option is absent when it is not offered',
+        (t) async {
+      await t.pumpWidget(wrap(const SecondViewScreen(
+        view: SecondView(baselineMm: 2.0, cardVisible: true))));
+      expect(find.text('Continue with one frame only'), findsNothing);
+    });
+
     test('ten millimetres is enough — the screen must not imply precision', () {
       expect(SecondView.enoughMm, 10.0);
       expect(const SecondView(baselineMm: 10.0, cardVisible: true).ready, isTrue);
