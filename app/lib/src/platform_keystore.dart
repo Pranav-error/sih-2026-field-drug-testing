@@ -71,11 +71,17 @@ class PlatformKeystore implements ftr.Keystore {
         'the hardware key signs asynchronously — use signAsync');
   }
 
-  /// The real signing path. The key never leaves the secure element; only the
-  /// digest goes in and only the signature comes out.
-  Future<Uint8List> signAsync(Uint8List digest) async {
+  /// The real signing path. The key never leaves the secure element.
+  ///
+  /// Takes the record **body**, not its digest. The key is generated with
+  /// `setDigests(DIGEST_SHA256)` and Android enforces that list, so asking the
+  /// keystore for `NONEwithECDSA` over a pre-computed digest throws — which is
+  /// what made the seal button silently do nothing. Signing the body with
+  /// `SHA256withECDSA` produces a signature over SHA-256(body), which *is* the
+  /// digest, and is exactly what both verifiers check.
+  Future<Uint8List> signBody(Uint8List body) async {
     final sig = await _channel.invokeMethod<String>(
-        'sign', {'digest': base64Encode(digest)});
+        'sign', {'body': base64Encode(body)});
     if (sig == null) throw StateError('the keystore returned no signature');
     return base64Decode(sig);
   }

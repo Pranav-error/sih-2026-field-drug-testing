@@ -111,6 +111,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
   Certificate? _certificate;
   Map<String, Object?> _envelope = const {};
   ftr.Report? _report;
+  String? _sealError;
+  bool _storedOk = false;
   PlatformKeystore? _hardware;
   String _keystoreNote = '';
 
@@ -269,7 +271,20 @@ class _CaptureFlowState extends State<CaptureFlow> {
   }
 
   Future<void> _seal() async {
-    final frame = Uint8List.fromList('frame $_sequence'.codeUnits);
+    try {
+      await _sealInner();
+    } catch (e) {
+      // Never silent. A seal that fails and says nothing is indistinguishable
+      // from a seal that worked, which is the worst possible failure mode for
+      // something whose entire job is producing trustworthy records.
+      if (!mounted) return;
+      setState(() => _sealError = '$e');
+    }
+  }
+
+  Future<void> _sealInner() async {
+    final shown = _live?.result ?? _result;
+    final frame = _frameA ?? Uint8List.fromList('frame $_sequence'.codeUnits);
     final body = ftr.buildBody(
       recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
       sequence: _store?.nextSequence ?? _sequence,
@@ -281,18 +296,28 @@ class _CaptureFlowState extends State<CaptureFlow> {
       capture: {
         'raw_image_sha256': ftr.sha256(frame),
         // The second view is evidence too, and is bound like the first.
-        'second_frame_sha256': ftr.sha256(
-            Uint8List.fromList('frame $_sequence view B'.codeUnits)),
+        if (_frameB != null) 'second_frame_sha256': ftr.sha256(_frameB!),
       },
+      // What was actually measured on this frame. Sealing the fallback constant
+      // would have produced a record that did not match the screen above it —
+      // the one thing an evidentiary record must never do.
       colorimetry: {
-        'measured': true,
-        'lab_x100': _result.lab!.map((v) => (v * 100).round()).toList(),
-        'gate_passed': true,
+        'measured': _live?.detected ?? false,
+        if (shown.lab != null)
+          'lab_x100': shown.lab!.map((v) => (v * 100).round()).toList(),
+        if (_live?.cardResidual != null)
+          'card_residual_x1000': (_live!.cardResidual! * 1000).round(),
+        'gate_passed': _live?.gatePassed ?? false,
+        'refusals': _live?.refusals ?? const <String>[],
       },
       classification: {
-        'alpha_x1000': (_result.alpha * 1000).round(),
-        'prediction_set': _result.predictionSet,
-        'label': _result.label,
+        'alpha_x1000': (shown.alpha * 1000).round(),
+        'threshold_x1000': (shown.threshold * 1000).round(),
+        'prediction_set': shown.predictionSet,
+        'label': shown.label,
+        'scores_x1000': {
+          for (final e in shown.scores.entries) e.key: (e.value * 1000).round(),
+        },
       },
       // The measured liveness, or an explicit "not checked" — never a default
       // that would read as having passed.
@@ -311,12 +336,12 @@ class _CaptureFlowState extends State<CaptureFlow> {
     final hw = _hardware;
     if (hw != null) {
       final bodyCbor = ftr.encode(body);
-      final digest = ftr.sha256(bodyCbor);
       final att = hw.attestation();
       rec = ftr.SealedRecord(
         bodyCbor: bodyCbor,
-        digest: digest,
-        signature: await hw.signAsync(digest),
+        digest: ftr.sha256(bodyCbor),
+        // The body, not the digest: the secure element hashes it itself.
+        signature: await hw.signBody(bodyCbor),
         publicKeyDer: att.publicKeyDer,
         attestation: att.toRecord(),
       );
@@ -342,6 +367,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
       _certificate = cert;
       _envelope = buildEnvelope(rec, certificateStatus: cert.status);
       _report = ftr.verifyRecord(ftr.toEnvelope(rec));
+      _sealError = null;
+      _storedOk = stored;
       _digestHex = ftr.hex(rec.digest);
       _chainHead = rec.digest;
       if (!stored) _sequence += 1;
@@ -475,13 +502,17 @@ class _CaptureFlowState extends State<CaptureFlow> {
         return ResultScreen(
           result: _live?.result ?? _result,
           liveness: _live?.liveness ?? const Liveness.notChecked(),
+          sealError: _sealError,
           onSeal: _seal,
         );
       case Step.sealed:
         return Scaffold(
           body: SealedScreen(
+            stored: _storedOk,
             digestHex: _digestHex,
-            sequence: _sequence - 1,
+            // The store owns sequencing once it exists; _sequence is only the
+            // in-memory fallback for a platform with no filesystem.
+            sequence: (_store?.length ?? _sequence) - 1,
             securityLevel: _posture.securityLevel,
             anchorWindow: _posture.anchorWindow,
             anchored: false,

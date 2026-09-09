@@ -326,11 +326,15 @@ class SecondViewScreen extends StatelessWidget {
 /// or a prompt to retry until the answer improves.
 class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key, required this.result, this.onSeal,
-      this.liveness = const Liveness.notChecked()});
+      this.liveness = const Liveness.notChecked(),
+    this.sealError});
 
   final TestResult result;
   final VoidCallback? onSeal;
   final Liveness liveness;
+
+  /// Why the last seal attempt failed, if it did. Shown rather than swallowed.
+  final String? sealError;
 
   @override
   Widget build(BuildContext context) {
@@ -403,6 +407,21 @@ class ResultScreen extends StatelessWidget {
         const PresumptiveNotice(),
       ],
       footer: [
+        if (sealError != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Tokens.positiveSoft,
+              border: Border.all(color: Tokens.positive),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text('Could not seal: $sealError',
+                style: const TextStyle(
+                    fontSize: 11.5, height: 1.4, color: Tokens.positive)),
+          ),
+        ],
         PrimaryButton('Seal record', onPressed: onSeal),
         const SizedBox(height: 8),
         const Text(
@@ -425,6 +444,7 @@ class SealedScreen extends StatelessWidget {
     required this.securityLevel,
     required this.anchorWindow,
     required this.anchored,
+    this.stored = false,
   });
 
   final String digestHex;
@@ -432,6 +452,10 @@ class SealedScreen extends StatelessWidget {
   final String securityLevel;
   final String anchorWindow;
   final bool anchored;
+
+  /// Whether the record reached storage. A record that is shown but not written
+  /// is not a record, so the screen must not imply it was kept.
+  final bool stored;
 
   @override
   Widget build(BuildContext context) {
@@ -447,6 +471,10 @@ class SealedScreen extends StatelessWidget {
             digestHex,
             style: Tokens.monoStyle(size: 11.5, colour: Tokens.ink2).copyWith(height: 1.5),
           ),
+        ]),
+        Panel(title: 'Storage', children: [
+          Measured('Written to the ledger', stored ? 'Yes' : 'NO — memory only',
+              tone: stored ? Tokens.negative : Tokens.abstain),
         ]),
         Panel(title: 'Signature', children: [
           Measured('Key', securityLevel,

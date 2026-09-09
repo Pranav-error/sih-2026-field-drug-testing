@@ -28,10 +28,11 @@ class MainActivity : FlutterActivity() {
                             ))
                         }
                         "sign" -> {
-                            val digest = Base64.decode(
-                                call.argument<String>("digest") ?: "", Base64.NO_WRAP)
+                            // The body, not the digest — see HardwareKeystore.sign.
+                            val body = Base64.decode(
+                                call.argument<String>("body") ?: "", Base64.NO_WRAP)
                             result.success(Base64.encodeToString(
-                                HardwareKeystore.sign(digest), Base64.NO_WRAP))
+                                HardwareKeystore.sign(body), Base64.NO_WRAP))
                         }
                         else -> result.notImplemented()
                     }
