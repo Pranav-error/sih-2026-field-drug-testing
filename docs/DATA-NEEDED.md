@@ -1,8 +1,19 @@
 # What we need, and what we must not go looking for
 
-Track F is the critical path. Everything else is built; **no number in this
-repository is a field accuracy** because no printed card has been through the
-capture matrix. This is the shopping list, in priority order.
+Track F is the critical path — **but not all of it is needed yet.** Most of what
+follows only pays off after selection, and doing it before would be work spent on
+a round that has not been cleared.
+
+So this is staged:
+
+| Stage | When | Effort |
+|---|---|---|
+| **A — before the internal round** | now | **about an hour** |
+| **B — after selection** | only if you advance | a weekend, plus some asking |
+
+Everything else is built. **No number in this repository is a field accuracy**,
+because no printed card has been through the full capture matrix — and Stage A is
+about buying the smallest honest correction to that sentence.
 
 > **First, the hard line.** Do not attempt to obtain controlled substances, and do
 > not attempt to obtain live NDPS reagent kits without written authorisation from
@@ -13,6 +24,46 @@ capture matrix. This is the shopping list, in priority order.
 > otherwise has misunderstood the design.
 
 ---
+
+# Stage A — before the internal round
+
+Roughly an hour. It exists to turn *"measured on synthetic frames"* into
+*"here it is working on a real card"*, which is the difference a judge notices.
+
+### A1. You have already done most of this
+
+The card you printed and photographed already runs clean through the pipeline:
+all four fiducials plus the tab marker, tilt 1.3°, reprojection 0.00 px,
+**card residual 0.27 ΔE**, gate PASS, in 180 ms. That single photograph is
+already evidence the optics work on real paper and a real sensor.
+
+### A2. Twenty photographs, not two thousand
+
+Same card, five lighting conditions, four shots each:
+
+- daylight near a window · room light · warm/tungsten lamp · phone torch · deep shade
+
+Run `ftr-ingest survey captures/` over them. If it reports a usable rate, you can
+say a real number about real captures on the slide. Twenty frames is not a
+calibration set and should not be presented as one — it is a demonstration that
+the pipeline survives contact with reality.
+
+### A3. The replay pair — your best 30 seconds on stage
+
+Photograph the card **displayed on a phone screen**, and the real card. Show the
+second being refused as flat. It is the most memorable thing in the whole system
+and it costs one extra photo.
+
+### A4. Test the APK on two different phones
+
+Not data — but the one thing nothing has been through. Check the standby screen
+says **STRONGBOX** or **TEE**, not `SOFTWARE`.
+
+That is Stage A. Everything below waits.
+
+---
+
+# Stage B — only if you are selected
 
 ## 1. Photographs of the printed card — the blocker
 
@@ -143,9 +194,14 @@ correct.
 
 ---
 
-## If you can only do one thing
+## The honest summary
 
-**§1.** Print ten cards, fold the tabs, and photograph them across five illuminants
-with two handsets. Even 200 usable frames turns every figure in the submission from
-*"measured on synthetic frames"* into *"measured on real captures"* — and that is
-the sentence a judge will ask about.
+**Before the internal round:** Stage A. About an hour, mostly already done.
+
+**After selection:** Stage B, and start with §1 — it is the only item that cannot
+be compressed by working harder in the last 48 hours. Everything else on this
+list is a phone call, an afternoon with a PDF, or one lab visit.
+
+And if the round is not cleared, none of Stage B was owed. The architecture was
+built so that substituting real data is a **data change, not an architecture
+change** — which is exactly what makes it safe to defer.

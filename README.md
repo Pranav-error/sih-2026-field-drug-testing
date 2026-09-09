@@ -254,7 +254,7 @@ None is a field accuracy.** No printed card has been photographed. See
 | **C** — crypto / provenance | **Done twice.** Python and Dart, independently written, cross-checked against shared vectors in both directions. |
 | **D** — app | **Built, and it runs standalone.** The whole L1/L2 pipeline and the two-view liveness check run on the handset in pure Dart — no laptop, no network, no native dependency. Signing uses StrongBox with an honest TEE fallback, and the attestation chain reaches the record.  Not yet run on a handset. |
 | **E** — legal / statutory | **Emitter built, Schedule transcribed.** Certificates carry the Act's real field labels and tick SHA256 as the Schedule names it. Still stamped DRAFT: the transcription is from a bare-Act repository, not the Gazette. **Remaining: one comparison against the eGazette PDF.** |
-| **F** — data | **Not started, and it is the critical path.** Card is printable, ingest tooling and protocol are built. It needs a person, a printer and a weekend. |
+| **F** — data | **Deliberately deferred.** Card is printable, ingest tooling and protocol are built, and a real printed card already runs clean through the pipeline (0.27 ΔE, gate PASS). The full capture matrix waits on selection — substituting real data is a data change, not an architecture change, which is what makes deferring it safe. |
 
 Two tasks now gate the submission and **neither is code**: compare the §63 Schedule
 against the Gazette, and run the capture matrix. Both are specified in
@@ -300,7 +300,7 @@ flagged, never recalled. → [`DETERMINISM.md`](docs/DETERMINISM.md)
 
 **Design and argument**
 - [`TIMELINE.md`](docs/TIMELINE.md) — the build log: what was made, and what testing proved wrong
-- [`DATA-NEEDED.md`](docs/DATA-NEEDED.md) — **what we still need and how to get it**, plus what must not be attempted
+- [`DATA-NEEDED.md`](docs/DATA-NEEDED.md) — what we still need, **staged: an hour before the internal round, a weekend only if selected**
 - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) — seven layers, the threat model, data strategy, build plan
 - [`NOVELTY.md`](docs/NOVELTY.md) — prior art conceded, what survives it, the §3(k) problem
 - [`DESIGN.md`](docs/DESIGN.md) — interface spec: tokens, the seven rules every screen obeys
