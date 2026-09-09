@@ -311,13 +311,17 @@ def verify_record(blob: bytes, images: dict[str, bytes] | None = None) -> Report
         )
     elif score is not None and total:
         collected = ", ".join(loc.get("channels_collected") or ["unspecified"])
-        if score == total:
-            # A single agreeing channel is not corroboration. Reporting it as
-            # "all channels agreed" would be true and deeply misleading.
+        if score == total and total < 2:
+            # One agreeing channel is not corroboration. Calling it "all channels
+            # agreed" would be true and deeply misleading.
             r.asserted.append(
-                f"{score} of {total} location channel(s) agreed — collected: {collected}. "
-                + (f"NOT collected: {', '.join(not_collected)}. A single channel is a "
-                   "claim, not corroboration." if total < 2 else "")
+                f"{score} of {total} location channel(s) agreed — collected: "
+                f"{collected}. NOT collected: {', '.join(not_collected)}. A single "
+                "channel is a claim, not corroboration."
+            )
+        elif score == total:
+            r.proven.append(
+                f"All {total} independent location channels agreed at capture."
             )
         else:
             r.asserted.append(

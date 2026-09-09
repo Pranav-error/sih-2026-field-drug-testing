@@ -46,6 +46,11 @@ dependencies:
   device_info_plus: ^13.2.0
   geolocator: ^14.0.3
 
+  # The share sheet is how a bundle leaves the handset. Not a network client:
+  # it hands a directory to whatever the officer already uses (USB, Files,
+  # a supervisor's laptop), which is why the app can stay offline.
+  share_plus: ^13.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

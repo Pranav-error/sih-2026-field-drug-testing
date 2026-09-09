@@ -67,6 +67,14 @@ met a real photograph or a real screen.
 | **StrongBox** | Keys generated in the secure element with an attestation challenge, honest TEE fallback, chain shipped raw. **The verifier reads verified-boot from the certificate, never from the record** — and fails a record that claims more hardware than its certificate attests to. |
 | ⚠ **A DER tag parsed wrongly** | `RootOfTrust` sits at context tag `[704]`, encoded `BF 85 40`. The first reader took only the leading byte and treated `0x85` as a length prefix. |
 
+| ⚠ **The seal button did nothing, on a real handset** | The key was generated with `setDigests(SHA256)` and signed with `NONEwithECDSA`, which Android rejects. Two bugs sat behind it: `_seal()` had no error handling, so the exception vanished, and the record being sealed was a hardcoded constant rather than the live measurement. |
+| ⚠ **The Dart verifier failed every genuine StrongBox record** | `IN_ATTESTATION` — the app's deliberate refusal to assert verified boot — fell through to the "modified device" branch. The app's honesty was being read as evidence against it. |
+| ⚠ **`biometric_unlock_used` was hardcoded `true`** | The key never had `setUserAuthenticationRequired`. A false claim inside a signed body. Set to `false`, and **both verifiers now state it** — silence would read as a pass. |
+| ⚠ **The location bundle claimed 4-of-4 channels agreeing** | On a device that had never read a position. Same class of lie as the biometric flag, and the largest remaining mockup. Replaced with a real fix that never invents: every failure path returns a status naming what happened, and the record says `available: false` rather than going quiet. Both verifiers now refuse to describe **one** agreeing channel as "all channels agreed" — true, and deeply misleading. |
+| **Offline made enforceable, not promised** | Once L1 ran on-device, the HTTP measure bridge was dead code on every path — so it went, and with it the `INTERNET` permission. "Works offline" became "cannot go online", enforced by Android rather than by our discipline. |
+| **Handoff, and what anchoring actually buys** | `exportChain` writes a self-contained bundle to the share sheet — no network client. Exporting is what witnesses the chain: once a bundle is off the handset, rewriting those records is contradicted by a copy the app cannot reach. Weaker than a countersigned timestamp, and labelled as weaker everywhere it appears. |
+| **Two devices in one directory** | Records from a second handset, each individually valid and correctly chained, imply an ordering no single device witnessed. Both implementations now check the signing key **across** the chain and report a `foreign_key` break. |
+
 ---
 
 ## Where it stands
@@ -76,7 +84,7 @@ met a real photograph or a real screen.
 | **A** — colour pipeline | Done; 83-condition sweep, 0 false accepts |
 | **B** — classification | Done and ablated; no learned component earned its place |
 | **C** — provenance | Done twice, cross-checked in both directions |
-| **D** — app | Standalone APK: on-device pipeline, liveness, StrongBox. **Never run on a handset.** |
+| **D** — app | Standalone APK: on-device pipeline, liveness, StrongBox, persistent ledger, handoff bundle. No `INTERNET` permission. **Tested on a handset; seal path fixed there.** |
 | **E** — statutory | Emitter built, Schedule transcribed. Needs one Gazette comparison. |
 | **F** — data | **Not started. The critical path.** See [`DATA-NEEDED.md`](DATA-NEEDED.md). |
 

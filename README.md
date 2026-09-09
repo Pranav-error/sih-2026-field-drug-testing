@@ -157,6 +157,28 @@ The record then goes into an **eSakshya / CCTNS-2.0 envelope** routed by FIR and
 seizure memo. CCTNS-2.0 stays the system of record — building a second evidence
 store would add a surveillance surface and a liability for no benefit.
 
+### 7b. Where the record lives, and how it leaves
+
+There is **no database**. The store is a directory of write-once files, one per
+record, named by sequence — `core/ftr/chain.py` and `app/lib/src/store.dart` are
+the same structure in two languages. A database's core feature (`UPDATE`,
+`DELETE`) is precisely the feature an evidence ledger must not have, and a
+partial write can then lose at most the record being made rather than the whole
+file. Ordering does not depend on the filesystem: `prev_record_hash` sits inside
+the signed body, so the chain reconstructs even if every file is renamed.
+
+The app cannot go online — no `INTERNET` permission — so handoff is an
+**export**, not an upload: a self-contained bundle (`.ftr` + envelope +
+certificate + frames + manifest + a README giving both verifier commands),
+handed to the Android share sheet. That is also what anchors the chain. A
+signature proves who sealed a record and the chain proves the order; neither
+proves *when*, and once a bundle is off the handset, rewriting those records is
+contradicted by a copy the app cannot reach. The Handoff screen shows how many
+records have never been witnessed off-device — the width of the window in which
+a timestamp could have been faked.
+
+Full detail, including why not a blockchain, is in [`LEDGER.md`](docs/LEDGER.md).
+
 ### 8. L7 — the part that makes the rest worth anything
 
 A separate verifier, with **no network and no trust in the app**, recomputes the
@@ -194,10 +216,14 @@ python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 
 ```sh
 .venv/bin/python -m ftr.printable --out card.png     # print at 100%, matte, no colour management
-.venv/bin/python core/tools/measure_server.py        # the real pipeline, on localhost:8824
 
-cd app && flutter run -d chrome                      # or: flutter build web && serve build/web
+cd app && flutter build apk --release                # the whole pipeline runs on the handset
 ```
+
+There is no server to start. The measurement bridge that used to sit on
+`localhost:8824` was deleted once L1 moved to pure Dart: it was dead code, and it
+listened on `0.0.0.0` with no authentication. The app now has **no `INTERNET`
+permission at all** — see [`LEDGER.md`](docs/LEDGER.md) §2.
 
 Point the camera at the printed card. **The numbers on screen are real** — fiducial
 count, tilt, card residual in ΔE, the prediction set, and the two-view liveness
@@ -252,7 +278,7 @@ None is a field accuracy.** No printed card has been photographed. See
 | **A** — colour pipeline | **Done and stress-tested.** Fiducials, homography, illumination correction, sampling, quality gate, device transform. Envelope swept over 83 conditions with 0 false accepts after three fixes. |
 | **B** — classification | **Done and ablated.** Conformal abstention with the finite-sample correction. Nearest-locus ΔE2000 beat Mahalanobis and logistic regression on held-out illuminants *and* held-out cameras, so L2 stays closed-form — no learned component, no TFLite. |
 | **C** — crypto / provenance | **Done twice.** Python and Dart, independently written, cross-checked against shared vectors in both directions. |
-| **D** — app | **Built, and it runs standalone.** The whole L1/L2 pipeline and the two-view liveness check run on the handset in pure Dart — no laptop, no network, no native dependency. Signing uses StrongBox with an honest TEE fallback, and the attestation chain reaches the record.  Not yet run on a handset. |
+| **D** — app | **Built, standalone, and offline by permission.** The whole L1/L2 pipeline and the two-view liveness check run on the handset in pure Dart — no laptop, no network, no native dependency. Signing uses StrongBox with an honest TEE fallback, and the attestation chain reaches the record. Records persist to an append-only ledger, and a handoff bundle leaves the device through the share sheet rather than a network. |
 | **E** — legal / statutory | **Emitter built, Schedule transcribed.** Certificates carry the Act's real field labels and tick SHA256 as the Schedule names it. Still stamped DRAFT: the transcription is from a bare-Act repository, not the Gazette. **Remaining: one comparison against the eGazette PDF.** |
 | **F** — data | **Deliberately deferred.** Card is printable, ingest tooling and protocol are built, and a real printed card already runs clean through the pipeline (0.27 ΔE, gate PASS). The full capture matrix waits on selection — substituting real data is a data change, not an architecture change, which is what makes deferring it safe. |
 
@@ -312,6 +338,7 @@ flagged, never recalled. → [`DETERMINISM.md`](docs/DETERMINISM.md)
 - [`DETERMINISM.md`](docs/DETERMINISM.md) — what "reproduces bit-for-bit" may actually claim
 - [`CERTIFICATE.md`](docs/CERTIFICATE.md) — what the §63 Schedule asks for, and the schema gap it exposed
 - [`CAPTURE.md`](docs/CAPTURE.md) — the track F protocol, and the only accuracy claim worth making
+- [`LEDGER.md`](docs/LEDGER.md) — storage, offline behaviour, anchoring, handoff, and why not a database or a blockchain
 
 **Submission**
 - [`SIH26231-idea-submission.pptx`](docs/SIH26231-idea-submission.pptx) / [`.pdf`](docs/SIH26231-idea-submission.pdf) — six slides from the official template

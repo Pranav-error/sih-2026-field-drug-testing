@@ -180,3 +180,67 @@ Map<String, Object?> buildEnvelope(ftr.SealedRecord rec, {String? certificateSta
         'laboratory analysis under NDPS procedure.',
   };
 }
+
+/// Render the certificate as plain text, for the handoff bundle.
+///
+/// Plain text on purpose: the certificate is filed on paper and signed by hand,
+/// and a format nobody needs a viewer for is one nobody can claim was altered
+/// in rendering. Blanks are printed as blanks — the whole point of this layer is
+/// that the app never signs for a human — and anything the record could not
+/// supply is named rather than silently omitted.
+String renderCertificate(Certificate c) {
+  final b = StringBuffer()
+    ..writeln('CERTIFICATE UNDER SECTION 63, BHARATIYA SAKSHYA ADHINIYAM 2023')
+    ..writeln('=' * 62)
+    ..writeln()
+    ..writeln('STATUS: ${c.status}')
+    ..writeln('Schedule text verification level: ${c.verificationLevel}');
+  if (c.isDraft) {
+    b
+      ..writeln()
+      ..writeln('This is a DRAFT. The Schedule text bundled with this app has not')
+      ..writeln('been checked against the official eGazette publication, so nothing')
+      ..writeln('here may be filed until it has been.');
+  }
+  if (c.missingFromRecord.isNotEmpty) {
+    b
+      ..writeln()
+      ..writeln('NOT SUPPLIED BY THE RECORD — must be completed by hand:');
+    for (final m in c.missingFromRecord) {
+      b.writeln('  - $m');
+    }
+  }
+
+  for (final part in c.parts) {
+    b
+      ..writeln()
+      ..writeln('-' * 62)
+      ..writeln('${part['title']}')
+      ..writeln('-' * 62);
+    final preamble = part['preamble'] as String?;
+    if (preamble != null && preamble.isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln(preamble);
+    }
+    b.writeln();
+    for (final item in (part['items'] as List).cast<Map<String, dynamic>>()) {
+      final key = item['key'] as String;
+      final label = item['label'] as String? ?? key;
+      final value = c.values[key];
+      b.writeln('  $label:'.padRight(46) +
+          (value ?? '________________________  [to be completed]'));
+    }
+  }
+
+  b
+    ..writeln()
+    ..writeln('-' * 62)
+    ..writeln('Signature: ______________________   Date: ______________')
+    ..writeln()
+    ..writeln('Record digest (SHA256): ${c.digestHex}')
+    ..writeln()
+    ..writeln('A presumptive field test is a screening indication. It does not')
+    ..writeln('identify a substance and does not replace laboratory analysis.');
+  return b.toString();
+}

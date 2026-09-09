@@ -222,3 +222,81 @@ def test_a_location_disagreement_is_recorded_not_suppressed(tmp_path):
     assert report.ok, "a disagreement is recorded, not a verification failure"
     assert any("Only 2 of 4" in a for a in report.asserted)
     assert any("310 km" in a for a in report.asserted)
+
+
+# --- two devices, one directory -------------------------------------------- #
+
+def test_a_second_device_cannot_be_spliced_into_a_chain(tmp_path):
+    """Records from two handsets, each individually valid, are still a fork.
+
+    The move: an officer's phone is seized mid-case and a replacement issued.
+    Someone copies the new phone's records into the old phone's directory so the
+    ledger looks continuous. Every record verifies. Every hash links. But the
+    ordering the directory now asserts was never witnessed by one device, and
+    two keys means two custody stories presented as one.
+    """
+    ks_a = SimulatedHardwareKeystore(tmp_path / "a.pem")
+    ks_b = SimulatedHardwareKeystore(tmp_path / "b.pem")
+    assert ks_a.public_key_der != ks_b.public_key_der
+
+    c = Chain(tmp_path / "chain")
+    c.append(seal(sample_ftr(), c.head(), 0, ks_a))
+    c.append(seal(sample_ftr(), c.head(), 1, ks_a))
+    # The splice: correctly chained, correctly sequenced, different key.
+    c.append(seal(sample_ftr(), c.head(), 2, ks_b))
+
+    st = c.status()
+    assert not st.intact
+    kinds = {b.kind for b in st.breaks}
+    assert "foreign_key" in kinds, st.breaks
+    assert [b.sequence for b in st.breaks if b.kind == "foreign_key"] == [2]
+
+
+def test_one_device_raises_no_foreign_key_break(chain):
+    """The check must not fire on the ordinary case it is meant to sit beside."""
+    assert all(b.kind != "foreign_key" for b in chain.status().breaks)
+
+
+# --- location, reported honestly ------------------------------------------- #
+
+def _with_location(bundle, tmp_path, keystore):
+    ftr_ = sample_ftr()
+    ftr_.location_bundle = bundle
+    c = Chain(tmp_path / "loc")
+    c.append(seal(ftr_, c.head(), 0, keystore))
+    return verify_record(c.records()[0].to_envelope())
+
+
+def test_one_agreeing_channel_is_never_reported_as_corroboration(tmp_path, keystore):
+    """"1 of 1 channels agreed" is true, and would read as a pass.
+
+    The bundle this app actually produces collects one channel. Presenting that
+    the same way as four independent channels agreeing is the exact shape of the
+    fabricated bundle this replaced, so it is graded as a claim and the channels
+    that were *not* collected are named.
+    """
+    r = _with_location({
+        "available": True,
+        "corroboration_channels_agreeing": 1,
+        "corroboration_channels_total": 1,
+        "channels_collected": ["fused_gnss"],
+        "channels_not_collected": ["raw_gnss_cn0", "wifi_bssid_set"],
+        "spoof_indicators": [],
+    }, tmp_path, keystore)
+    text = " ".join(r.asserted)
+    assert "not corroboration" in text
+    assert "raw_gnss_cn0" in text
+    assert not any("location channel" in p for p in r.proven)
+
+
+def test_an_unavailable_fix_is_stated_not_left_silent(tmp_path, keystore):
+    """Silence about position reads as a pass. It must read as an absence."""
+    r = _with_location({
+        "available": False,
+        "status": "permission denied",
+        "channels_collected": [],
+        "channels_not_collected": ["fused_gnss"],
+        "spoof_indicators": [],
+    }, tmp_path, keystore)
+    text = " ".join(r.asserted)
+    assert "No position was recorded" in text and "permission denied" in text

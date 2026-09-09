@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:ftr_verify/ftr_verify.dart' as ftr;
 
+import 'handoff.dart';
 import 'certificate.dart';
 import 'screens.dart';
 
@@ -273,6 +274,7 @@ class LogScreen extends StatelessWidget {
     required this.storePath,
     required this.bytesUsed,
     this.onOpen,
+    this.onHandoff,
     this.onBack,
   });
 
@@ -286,6 +288,7 @@ class LogScreen extends StatelessWidget {
   final int bytesUsed;
   final ValueChanged<int>? onOpen;
   final VoidCallback? onBack;
+  final VoidCallback? onHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -335,6 +338,9 @@ class LogScreen extends StatelessWidget {
           ]),
       ],
       footer: [
+        PrimaryButton('Handoff to CCTNS-2.0',
+            onPressed: records.isEmpty ? null : onHandoff),
+        const SizedBox(height: 8),
         PrimaryButton.ghost('Back', onPressed: onBack),
         const SizedBox(height: 8),
         const Text('Records cannot be deleted. A withdrawn test is annotated and '
@@ -611,6 +617,129 @@ class _Bucket extends StatelessWidget {
                     fontSize: 11.5, height: 1.45, color: Tokens.ink2)),
           ),
       ]),
+    );
+  }
+}
+
+// --------------------------------------------------------------------------- //
+// 10 — handoff
+// --------------------------------------------------------------------------- //
+
+/// What leaves the handset, and what witnessing it actually buys.
+///
+/// Not an upload screen. The app has no INTERNET permission, so this writes a
+/// self-contained directory and hands it to the share sheet. The screen is blunt
+/// about the difference between that and a countersigned timestamp, because the
+/// gap between "witnessed" and "timestamped" is exactly the gap a defence
+/// counsel will press on.
+class HandoffScreen extends StatelessWidget {
+  const HandoffScreen({
+    super.key,
+    required this.recordCount,
+    required this.unanchored,
+    required this.lastAnchor,
+    required this.result,
+    required this.busy,
+    required this.error,
+    this.onExport,
+    this.onShare,
+    this.onBack,
+  });
+
+  final int recordCount;
+  final int unanchored;
+  final int? lastAnchor;
+  final BundleResult? result;
+  final bool busy;
+  final String? error;
+  final VoidCallback? onExport;
+  final VoidCallback? onShare;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = result;
+    return AppScaffold(
+      title: 'Handoff to CCTNS-2.0',
+      chip: StateChip(
+        unanchored == 0 ? 'Witnessed' : '$unanchored unwitnessed',
+        colour: unanchored == 0 ? Tokens.positive : Tokens.abstain,
+        soft: unanchored == 0 ? Tokens.positiveSoft : Tokens.abstainSoft,
+      ),
+      body: [
+        Panel(title: 'Chain', children: [
+          Measured('Records sealed', '$recordCount'),
+          Measured(
+            'Witnessed off-device',
+            lastAnchor == null
+                ? 'none yet'
+                : 'up to #${lastAnchor.toString().padLeft(6, '0')}',
+            tone: lastAnchor == null ? Tokens.abstain : Tokens.positive,
+          ),
+          Measured('Fabrication window', '$unanchored record(s) wide',
+              tone: unanchored == 0 ? Tokens.positive : Tokens.abstain),
+          const SizedBox(height: 6),
+          const Text(
+            'A signature proves who sealed a record; the chain proves what order '
+            'they were sealed in. Neither proves when. Exporting bounds the '
+            'window: once a bundle is off this handset, rewriting these records '
+            'is contradicted by a copy the app cannot reach.',
+            style: TextStyle(fontSize: 11.5, height: 1.45, color: Tokens.muted),
+          ),
+        ]),
+        Panel(title: 'What the bundle contains', children: const [
+          Measured('.ftr', 'the evidence — canonical CBOR, signed'),
+          Measured('.esakshya.json', 'routing envelope (provisional names)'),
+          Measured('.bsa63.txt', 'BSA §63 certificate, blanks left blank'),
+          Measured('.a/.b.jpg', 'the frames the image hashes refer to'),
+          Measured('MANIFEST.json', 'chain head, key, and what was written'),
+          SizedBox(height: 6),
+          Text(
+            'The .ftr file is the evidence. Everything else is derived from it '
+            'and can be recomputed by someone who does not trust this app — the '
+            'README in the bundle gives them both verifier commands.',
+            style: TextStyle(fontSize: 11.5, height: 1.45, color: Tokens.muted),
+          ),
+        ]),
+        Panel(title: 'Not claimed', tint: true, children: const [
+          Measured('Upload to CCTNS-2.0', 'NOT IMPLEMENTED', tone: Tokens.negative),
+          Measured('Countersigned timestamp', 'NOT IMPLEMENTED',
+              tone: Tokens.negative),
+          SizedBox(height: 6),
+          Text(
+            'No published eSakshya ingest interface has been found, so no upload '
+            'is written against a guess. An export receipt is a weaker anchor '
+            'than a timestamping authority and is labelled as one everywhere it '
+            'appears.',
+            style: TextStyle(fontSize: 11.5, height: 1.45, color: Tokens.muted),
+          ),
+        ]),
+        if (error != null)
+          Panel(title: 'Export failed', children: [
+            Text(error!,
+                style: const TextStyle(
+                    fontSize: 12, height: 1.45, color: Tokens.negative)),
+          ]),
+        if (r != null)
+          Panel(title: 'Bundle written', children: [
+            Measured('Files', '${r.files.length}'),
+            Measured('Size', '${(r.bytes / 1024).toStringAsFixed(0)} KB'),
+            Measured('Anchored to',
+                '#${r.anchoredTo.toString().padLeft(6, '0')}',
+                tone: Tokens.positive),
+            const SizedBox(height: 3),
+            Text(r.dir.path,
+                style: Tokens.monoStyle(size: 9.5, colour: Tokens.muted)),
+          ]),
+      ],
+      footer: [
+        PrimaryButton.ghost('Back', onPressed: onBack),
+        if (r == null)
+          PrimaryButton(busy ? 'Writing…' : 'Export bundle',
+              onPressed: busy ? null : onExport)
+        else
+          PrimaryButton('Share bundle', onPressed: onShare),
+      ],
     );
   }
 }

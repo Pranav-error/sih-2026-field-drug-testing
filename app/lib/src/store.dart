@@ -47,6 +47,39 @@ class RecordStore {
 
   int get nextSequence => _files.length;
 
+  // -- anchoring ---------------------------------------------------------- //
+  //
+  // The signature proves who sealed a record and the chain proves the order they
+  // were sealed in. Neither proves *when*: a handset can only assert its own
+  // clock, and a handset with no network cannot be told otherwise. What an
+  // anchor does is bound the window in which a timestamp could have been
+  // fabricated — before the anchor the ordering is witnessed by someone outside
+  // this device, after it the window is open. So the honest thing is not to hide
+  // the window but to report how wide it is, which is what [unanchored] does.
+
+  File get _anchorFile => File('${_dir.path}/ANCHOR');
+
+  /// Sequence witnessed by something outside this handset, or null if none is.
+  int? get lastAnchor {
+    if (!_anchorFile.existsSync()) return null;
+    return int.tryParse(_anchorFile.readAsStringSync().trim());
+  }
+
+  /// How many sealed records have never been witnessed outside this device.
+  int get unanchored {
+    final a = lastAnchor;
+    return a == null ? length : (length - (a + 1)).clamp(0, length);
+  }
+
+  /// Record that the chain was witnessed up to [sequence].
+  ///
+  /// Exporting a bundle is what witnesses it here: the bundle leaves the handset
+  /// and lands somewhere this app cannot reach, so any later rewrite of those
+  /// records is contradicted by a copy the app does not control. That is a
+  /// weaker anchor than a countersigning service and it is labelled as such
+  /// everywhere it is reported — but it is real, and it needs no network.
+  void anchor(int sequence) => _anchorFile.writeAsStringSync('$sequence');
+
   List<ftr.SealedRecord> records() => _files
       .map((f) => ftr.SealedRecord.fromEnvelope(f.readAsBytesSync()))
       .toList();
@@ -106,6 +139,7 @@ class RecordStore {
   /// Replay the chain and report every defect rather than the first.
   ({bool intact, List<String> breaks}) status() {
     final breaks = <String>[];
+    List<int>? deviceKey;
     var prev = ftr.genesisHash;
     final recs = records();
     for (var i = 0; i < recs.length; i++) {
@@ -118,6 +152,22 @@ class RecordStore {
       }
       if (!r.signatureValid) {
         breaks.add('#${r.sequence} signature does not verify');
+      }
+      // One chain, one signing key. Two devices' records interleaved into one
+      // directory would each verify individually while the sequence they imply
+      // never happened, so the key fingerprint is checked across the chain and
+      // not only within a record.
+      // Byte lists, so compare contents: `!=` on two Uint8Lists is identity
+      // and would silently never fire.
+      final key = r.attestation['public_key_sha256'];
+      if (key is List<int>) {
+        if (deviceKey == null) {
+          deviceKey = key;
+        } else if (!ftr.bytesEqual(
+            Uint8List.fromList(key), Uint8List.fromList(deviceKey))) {
+          breaks.add('#${r.sequence} was sealed by a different key than the '
+              'records before it — two devices in one chain');
+        }
       }
       prev = r.digest;
     }

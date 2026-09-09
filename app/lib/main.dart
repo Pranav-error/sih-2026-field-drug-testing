@@ -18,6 +18,8 @@ import 'src/measure_bridge.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 import 'src/certificate.dart';
+import 'package:share_plus/share_plus.dart';
+import 'src/handoff.dart';
 import 'src/location.dart';
 import 'src/platform_keystore.dart';
 import 'src/screens_extra.dart';
@@ -91,7 +93,10 @@ class PhoneFrame extends StatelessWidget {
   }
 }
 
-enum Step { standby, setup, capture, secondView, gate, result, sealed, log, certificate, verifier }
+enum Step {
+  standby, setup, capture, secondView, gate, result, sealed, log, certificate,
+  verifier, handoff,
+}
 
 class CaptureFlow extends StatefulWidget {
   const CaptureFlow({super.key});
@@ -117,6 +122,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
   String _memo = '';
   Certificate? _certificate;
   Map<String, Object?> _envelope = const {};
+
+  BundleResult? _bundle;
+  bool _exporting = false;
+  String? _exportError;
   ftr.Report? _report;
   String? _sealError;
   bool _storedOk = false;
@@ -429,6 +438,43 @@ class _CaptureFlowState extends State<CaptureFlow> {
   @override
   Widget build(BuildContext context) => PhoneFrame(child: _screen());
 
+  /// Write the bundle. Errors surface on the screen rather than vanishing —
+  /// a handoff that silently did nothing is worse than one that failed loudly.
+  Future<void> _export() async {
+    final store = _store;
+    if (store == null) {
+      setState(() => _exportError = 'No filesystem on this platform.');
+      return;
+    }
+    setState(() {
+      _exporting = true;
+      _exportError = null;
+    });
+    try {
+      final schedule = await ScheduleLoader.load();
+      final res = await exportChain(store,
+          certificateFor: (rec) => buildCertificate(rec, schedule));
+      if (mounted) setState(() => _bundle = res);
+    } catch (e) {
+      if (mounted) setState(() => _exportError = '$e');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _shareBundle() async {
+    final b = _bundle;
+    if (b == null) return;
+    try {
+      await SharePlus.instance.share(ShareParams(
+        files: b.files.map((f) => XFile(f.path)).toList(),
+        subject: 'Field Test Record handoff — ${b.files.length} file(s)',
+      ));
+    } catch (e) {
+      if (mounted) setState(() => _exportError = 'Share failed: $e');
+    }
+  }
+
   Widget _screen() {
     switch (_step) {
       case Step.setup:
@@ -477,6 +523,19 @@ class _CaptureFlowState extends State<CaptureFlow> {
             _step = Step.verifier;
           }),
           onBack: () => setState(() => _step = Step.standby),
+        );
+
+      case Step.handoff:
+        return HandoffScreen(
+          recordCount: _store?.length ?? 0,
+          unanchored: _store?.unanchored ?? 0,
+          lastAnchor: _store?.lastAnchor,
+          result: _bundle,
+          busy: _exporting,
+          error: _exportError,
+          onExport: _export,
+          onShare: _shareBundle,
+          onBack: () => setState(() => _step = Step.log),
         );
 
       case Step.certificate:

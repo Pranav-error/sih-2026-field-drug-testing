@@ -167,6 +167,60 @@ void main() {
     });
   });
 
+  group('location is reported honestly, or reported as absent', () {
+    Report withLocation(Map<String, Object?> loc) {
+      final body = <String, Object?>{
+        'schema_version': 1,
+        'record_uuid': 'loc-0001',
+        'sequence': 0,
+        'prev_record_hash': genesisHash,
+        'captured_at': '2026-09-09T00:00:00Z',
+        'operator': <String, Object?>{},
+        'kit': <String, Object?>{},
+        'card': <String, Object?>{},
+        'capture': <String, Object?>{},
+        'colorimetry': {'measured': true, 'gate_passed': true},
+        'liveness': {'checked': false},
+        'classification': {'label': 'opiate_class', 'prediction_set': ['opiate_class']},
+        'location_bundle': loc,
+        'device': <String, Object?>{},
+        'ndps': <String, Object?>{},
+        'omitted': <String>[],
+      };
+      return verifyRecord(toEnvelope(seal(body, SoftwareKeystore(seed: 4))));
+    }
+
+    test('one agreeing channel is never reported as corroboration', () {
+      // "1 of 1 channels agreed" is true, and would read as a pass. It is the
+      // same shape as the fabricated 4-of-4 bundle this replaced.
+      final r = withLocation({
+        'available': true,
+        'corroboration_channels_agreeing': 1,
+        'corroboration_channels_total': 1,
+        'channels_collected': ['fused_gnss'],
+        'channels_not_collected': ['raw_gnss_cn0', 'wifi_bssid_set'],
+        'spoof_indicators': <String>[],
+      });
+      final text = r.asserted.join(' ');
+      expect(text, contains('not corroboration'));
+      expect(text, contains('raw_gnss_cn0'));
+      expect(r.proven.any((p) => p.contains('location channel')), isFalse);
+    });
+
+    test('an unavailable fix is stated, not left silent', () {
+      final r = withLocation({
+        'available': false,
+        'status': 'permission denied',
+        'channels_collected': <String>[],
+        'channels_not_collected': ['fused_gnss'],
+        'spoof_indicators': <String>[],
+      });
+      final text = r.asserted.join(' ');
+      expect(text, contains('No position was recorded'));
+      expect(text, contains('permission denied'));
+    });
+  });
+
   group('a genuine hardware record must not read as a modified device', () {
     // Regression: PlatformKeystore reports verified boot as IN_ATTESTATION,
     // because the authoritative value is inside the certificate and the app

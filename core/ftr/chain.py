@@ -30,7 +30,8 @@ class ChainBreak:
     """One defect found while replaying. ``kind`` is machine-readable."""
 
     sequence: int
-    kind: str          # gap | fork | bad_signature | bad_sequence | duplicate_genesis
+    kind: str          # gap | fork | bad_signature | bad_sequence |
+                       # duplicate_genesis | foreign_key
     detail: str
 
 
@@ -134,6 +135,7 @@ class Chain:
         breaks: list[ChainBreak] = []
         prev_digest = GENESIS_HASH
         genesis_seen = 0
+        device_key: str | None = None
 
         for i, r in enumerate(recs):
             seq = r.sequence
@@ -145,6 +147,21 @@ class Chain:
                 if genesis_seen > 1:
                     breaks.append(ChainBreak(seq, "duplicate_genesis",
                                              "a second record claims to be first on this device"))
+            # One chain, one signing key. Records from two handsets dropped
+            # into one directory would each verify on their own while the
+            # sequence they jointly imply never happened, so the key is checked
+            # across the chain and not only inside a record.
+            key = (r.attestation or {}).get("public_key_sha256")
+            if key is not None:
+                if device_key is None:
+                    device_key = key
+                elif key != device_key:
+                    breaks.append(ChainBreak(
+                        seq, "foreign_key",
+                        "sealed by a different key than the records before it — "
+                        "two devices in one chain",
+                    ))
+
             if r.prev_record_hash != prev_digest:
                 kind = "gap" if i > 0 else "fork"
                 breaks.append(ChainBreak(

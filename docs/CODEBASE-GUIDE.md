@@ -106,8 +106,9 @@ was. It is what kind of device produced this.
 |---|---|
 | Security level (STRONGBOX / TEE / SOFTWARE) | **Yes** — `KeyInfo.getSecurityLevel()` |
 | Verified boot / bootloader | Displays `IN ATTESTATION` — deliberately not asserted by the app; see §5 |
-| Mock location | **NOT IMPLEMENTED.** `main.dart:194` hardcodes `mockLocation: false` |
-| Records on device / anchor window | **NOT IMPLEMENTED as real state** — derived from an in-memory counter |
+| Mock location | **Yes** — `location.dart` surfaces `Position.isMocked` as a spoof indicator |
+| Records on device | **Yes** — `RecordStore.length`, read off the filesystem |
+| Anchor window | **Yes** — `RecordStore.unanchored`, from the `ANCHOR` file; see `LEDGER.md` §3 |
 
 ### Step 2 — the chemistry
 
@@ -512,12 +513,17 @@ app/android/.../kotlin/
 | Digital signature | ✔ | **YES**, ECDSA P-256 | `signing.py`, `HardwareKeystore.kt` |
 | **StrongBox** | ✔ | **YES**, TEE fallback | `HardwareKeystore.kt` — ⚠ never run on a handset |
 | **Verified boot** | ✔ | **Read from the certificate by the verifier** | `attestation.py` — the app does **not** assert it |
-| Hash chain | ✔ | **Python only** | `chain.py` — **the app does not persist records** |
-| **External anchoring** | ✔ | **NO** — writes a sequence number, no countersignature | `chain.py::anchor` |
+| Hash chain | ✔ | **YES**, both | `chain.py`, `store.dart::RecordStore` |
+| **Two devices spliced into one chain** | — | **YES** — `foreign_key` break | `chain.py::status`, `store.dart::status` |
+| **External anchoring** | ✔ | **PARTIAL** — export witnesses the chain; no countersignature | `handoff.dart::exportChain`, `store.dart::anchor` |
+| **Countersigned timestamp (RFC 3161)** | ✔ | **NOT IMPLEMENTED** — needs a network; would cost the offline guarantee | `LEDGER.md` §3 |
 | Offline verification | ✔ | **YES** | `cli.py`, `ftrverify.dart` |
 | **Print/photo attack detection** | ✔ | **YES** | `parallax.py`, `livenessOnDevice` |
-| **Mock-location detection** | ✔ | **NOT IMPLEMENTED** | `main.dart:194` hardcodes `false` |
-| **GPS / L3 corroboration** | ✔ | **NOT IMPLEMENTED** | `main.dart:282` hardcodes the bundle |
+| **Mock-location detection** | ✔ | **YES** | `location.dart` — `Position.isMocked` into `spoof_indicators` |
+| **GPS in the record** | ✔ | **YES** — real fix, or an explicit "unavailable" | `location.dart::LocationReader.read` |
+| **L3 multi-channel corroboration** | ✔ | **NOT IMPLEMENTED** — 1 of 5 channels collected, and the record names the other 4 | `location.dart`, `verifier.*` |
+| **Handoff bundle off the device** | ✔ | **YES** — share sheet, no network | `handoff.dart::exportChain`, `HandoffScreen` |
+| **Upload to eSakshya / CCTNS-2.0** | ✔ | **NOT IMPLEMENTED** — no published ingest spec | `LEDGER.md` §4 |
 | **§63 certificate in the app** | ✔ | **YES** | `app/lib/src/certificate.dart::buildCertificate`, `CertificateScreen` |
 | **eSakshya handoff in the app** | ✔ | **YES** | `certificate.dart::buildEnvelope`, shown on the certificate screen |
 | Record log / persistence | ✔ | **YES** | `app/lib/src/store.dart::RecordStore` — records written to app storage |
