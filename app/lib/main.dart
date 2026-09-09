@@ -15,7 +15,10 @@ library;
 
 
 import 'src/measure_bridge.dart';
+import 'src/certificate.dart';
 import 'src/platform_keystore.dart';
+import 'src/screens_extra.dart';
+import 'src/store.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -85,7 +88,7 @@ class PhoneFrame extends StatelessWidget {
   }
 }
 
-enum Step { standby, capture, secondView, result, sealed }
+enum Step { standby, setup, capture, secondView, gate, result, sealed, log, certificate, verifier }
 
 class CaptureFlow extends StatefulWidget {
   const CaptureFlow({super.key});
@@ -101,6 +104,13 @@ class _CaptureFlowState extends State<CaptureFlow> {
   // it is a development key that honestly reports SOFTWARE, and every verifier
   // treats that as disqualifying.
   final _software = ftr.SoftwareKeystore();
+  RecordStore? _store;
+  String _reagent = 'Marquis';
+  String _fir = '';
+  String _memo = '';
+  Certificate? _certificate;
+  Map<String, Object?> _envelope = const {};
+  ftr.Report? _report;
   PlatformKeystore? _hardware;
   String _keystoreNote = '';
 
@@ -165,7 +175,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
   Future<void> _confirmPair() async {
     final a = _frameA, b = _frameB;
     if (a == null || b == null) {
-      setState(() => _step = Step.result);
+      setState(() => _step = Step.gate);
       return;
     }
     setState(() => _pairing = true);
@@ -175,7 +185,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
     setState(() {
       if (m != null) _live = m;
       _pairing = false;
-      _step = Step.result;
+      _step = Step.gate;
     });
   }
 
@@ -192,8 +202,8 @@ class _CaptureFlowState extends State<CaptureFlow> {
             ? 'IN ATTESTATION'
             : _software.attestation().osPatchLevel,
         mockLocation: false,
-        recordCount: _sequence,
-        unanchored: _sequence,
+        recordCount: _store?.length ?? _sequence,
+        unanchored: _store?.length ?? _sequence,
         sinceAnchor: Duration(minutes: 4 * _sequence),
       );
 
@@ -201,6 +211,17 @@ class _CaptureFlowState extends State<CaptureFlow> {
   void initState() {
     super.initState();
     _openKeystore();
+    _openStore();
+  }
+
+  Future<void> _openStore() async {
+    try {
+      final s = await RecordStore.open();
+      if (mounted) setState(() => _store = s);
+    } catch (_) {
+      // No filesystem (web). The flow still works; nothing persists, and the
+      // record log says so rather than showing an empty chain as if it were one.
+    }
   }
 
   Future<void> _openKeystore() async {
@@ -251,11 +272,11 @@ class _CaptureFlowState extends State<CaptureFlow> {
     final frame = Uint8List.fromList('frame $_sequence'.codeUnits);
     final body = ftr.buildBody(
       recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
-      sequence: _sequence,
-      prevRecordHash: _chainHead,
+      sequence: _store?.nextSequence ?? _sequence,
+      prevRecordHash: _store?.head ?? _chainHead,
       capturedAt: {'device_clock': DateTime.now().toIso8601String()},
       operator_: {'id': 'NCB/BLR/2291', 'biometric_unlock_used': true},
-      kit: {'reagent_type': 'marquis'},
+      kit: {'reagent_type': _reagent.toLowerCase()},
       card: {'card_id': 'CARD-IN-2026-0417', 'print_batch': 'B12'},
       capture: {
         'raw_image_sha256': ftr.sha256(frame),
@@ -303,10 +324,27 @@ class _CaptureFlowState extends State<CaptureFlow> {
       rec = ftr.seal(body, _software);
     }
     if (!mounted) return;
+
+    // Persist before anything else. A record that is shown but not written is
+    // not a record, and the ledger's guarantees are about files on disk.
+    var stored = false;
+    try {
+      _store?.append(rec);
+      stored = _store != null;
+    } catch (_) {
+      stored = false;
+    }
+
+    final schedule = await ScheduleLoader.load();
+    final cert = buildCertificate(rec, schedule);
+    if (!mounted) return;
     setState(() {
+      _certificate = cert;
+      _envelope = buildEnvelope(rec, certificateStatus: cert.status);
+      _report = ftr.verifyRecord(ftr.toEnvelope(rec));
       _digestHex = ftr.hex(rec.digest);
       _chainHead = rec.digest;
-      _sequence += 1;
+      if (!stored) _sequence += 1;
       _step = Step.sealed;
     });
   }
@@ -316,14 +354,69 @@ class _CaptureFlowState extends State<CaptureFlow> {
 
   Widget _screen() {
     switch (_step) {
+      case Step.setup:
+        return SetupScreen(
+          reagent: _reagent,
+          onReagent: (r) => setState(() => _reagent = r),
+          firRef: _fir,
+          memoRef: _memo,
+          onFir: (v) => _fir = v,
+          onMemo: (v) => _memo = v,
+          onContinue: () => setState(() => _step = Step.capture),
+        );
+
+      case Step.gate:
+        return GateScreen(
+          quality: _quality,
+          cardResidual: _live?.cardResidual,
+          liveness: _live?.liveness ?? const Liveness.notChecked(),
+          refusals: _live?.refusals ?? const [],
+          onContinue: () => setState(() => _step = Step.result),
+          onRetake: () => setState(() {
+            _live = null;
+            _frameA = null;
+            _frameB = null;
+            _step = Step.capture;
+          }),
+        );
+
+      case Step.log:
+        final st = _store?.status();
+        return LogScreen(
+          records: _store?.records() ?? const [],
+          intact: st?.intact ?? true,
+          breaks: st?.breaks ?? const [],
+          onOpen: (i) => setState(() {
+            final rec = _store!.records()[i];
+            _report = ftr.verifyRecord(ftr.toEnvelope(rec));
+            _step = Step.verifier;
+          }),
+          onBack: () => setState(() => _step = Step.standby),
+        );
+
+      case Step.certificate:
+        return CertificateScreen(
+          certificate: _certificate!,
+          envelope: _envelope,
+          onBack: () => setState(() => _step = Step.sealed),
+        );
+
+      case Step.verifier:
+        return VerifierScreen(
+          report: _report!,
+          onBack: () => setState(() =>
+              _step = _certificate == null ? Step.log : Step.sealed),
+        );
+
       case Step.standby:
         return StandbyScreen(
           posture: _posture,
           keystoreNote: _keystoreNote,
           onBegin: () => setState(() {
             _progress = 0;
-            _step = Step.capture;
+            _step = Step.setup;
           }),
+          onOpenLog: () => setState(() => _step = Step.log),
         );
       case Step.capture:
         return Stack(children: [
@@ -374,7 +467,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
                       cardResidual: _live!.cardResidual,
                       result: _live!.result,
                     );
-              _step = Step.result;
+              _step = Step.gate;
             }),
           ),
         ]);
@@ -393,10 +486,33 @@ class _CaptureFlowState extends State<CaptureFlow> {
             anchorWindow: _posture.anchorWindow,
             anchored: false,
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => setState(() => _step = Step.standby),
-            label: const Text('Done'),
-            icon: const Icon(Icons.check),
+          floatingActionButton: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (_certificate != null)
+                FloatingActionButton.extended(
+                  heroTag: 'cert',
+                  onPressed: () => setState(() => _step = Step.certificate),
+                  label: const Text('§63 certificate'),
+                  icon: const Icon(Icons.description_outlined),
+                ),
+              const SizedBox(height: 8),
+              if (_report != null)
+                FloatingActionButton.extended(
+                  heroTag: 'verify',
+                  onPressed: () => setState(() => _step = Step.verifier),
+                  label: const Text('Verify'),
+                  icon: const Icon(Icons.verified_outlined),
+                ),
+              const SizedBox(height: 8),
+              FloatingActionButton.extended(
+                heroTag: 'done',
+                onPressed: () => setState(() => _step = Step.standby),
+                label: const Text('Done'),
+                icon: const Icon(Icons.check),
+              ),
+            ],
           ),
         );
     }

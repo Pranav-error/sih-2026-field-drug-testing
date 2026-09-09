@@ -25,10 +25,12 @@ class StandbyScreen extends StatelessWidget {
     this.bridgeReachable,
     this.onEditBridge,
     this.keystoreNote,
+    this.onOpenLog,
   });
 
   final DevicePosture posture;
   final VoidCallback? onBegin;
+  final VoidCallback? onOpenLog;
 
   /// Why the hardware guarantee is weaker than requested, when it is — for
   /// instance a handset with no discrete secure element falling back to the TEE.
@@ -43,7 +45,7 @@ class StandbyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hw = posture.evidenceGrade;
-    return _Scaffold(
+    return AppScaffold(
       title: 'Ready',
       chip: StateChip(
         posture.securityLevel,
@@ -98,6 +100,10 @@ class StandbyScreen extends StatelessWidget {
       footer: [
         PrimaryButton('Begin field test', onPressed: onBegin),
         const SizedBox(height: 8),
+        if (onOpenLog != null) ...[
+          PrimaryButton.ghost('Open record log', onPressed: onOpenLog),
+          const SizedBox(height: 8),
+        ],
         const Text(
           'Presumptive testing only. Results are not confirmatory and do not '
           'replace laboratory analysis.',
@@ -139,7 +145,7 @@ class CaptureScreen extends StatelessWidget {
     // non-null. Duplicating the thresholds here would let the UI and the record
     // disagree about whether a frame was usable.
     final locked = measured ? onCapture != null : quality.locked;
-    return _Scaffold(
+    return AppScaffold(
       title: 'Frame the card',
       step: 1,
       chip: StateChip(locked ? 'Locked' : 'Aligning',
@@ -223,7 +229,7 @@ class SecondViewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Scaffold(
+    return AppScaffold(
       title: 'Second view',
       step: 2,
       chip: StateChip(view.ready ? 'Far enough' : 'Keep moving',
@@ -332,7 +338,7 @@ class ResultScreen extends StatelessWidget {
     final setText =
         result.predictionSet.isEmpty ? '∅' : result.predictionSet.join(', ');
 
-    return _Scaffold(
+    return AppScaffold(
       title: 'Result',
       chip: StateChip('Presumptive', colour: outcome.colour, soft: outcome.soft),
       body: [
@@ -429,7 +435,7 @@ class SealedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Scaffold(
+    return AppScaffold(
       title: 'Record sealed',
       chip: const StateChip('Signed', colour: Tokens.negative, soft: Tokens.negativeSoft),
       body: [
@@ -464,8 +470,11 @@ class SealedScreen extends StatelessWidget {
   }
 }
 
-class _Scaffold extends StatelessWidget {
-  const _Scaffold({
+/// The chrome every screen shares: app bar with a state chip, a scrolling body,
+/// and a fixed footer holding the primary action within thumb reach.
+class AppScaffold extends StatelessWidget {
+  const AppScaffold({
+    super.key,
     required this.title,
     required this.chip,
     required this.body,

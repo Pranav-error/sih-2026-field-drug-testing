@@ -378,14 +378,15 @@ shared_preferences, no server. Verified by grep across `core`, `app/lib` and `da
 A directory rather than one file, deliberately: appending must never rewrite an
 existing byte, so a partial write can lose at most the record being made.
 
-### ⚠ The app does not persist anything
+### The app persists records
 
-`main.dart::_seal()` builds a `SealedRecord`, shows its digest, and **keeps it in
-memory**. There is no `writeAsBytes`, no file path, no export. Close the app and the
-record is gone.
+`app/lib/src/store.dart::RecordStore` writes each sealed record as `NNNNNN.ftr`
+into the app's documents directory, mirroring `chain.py::Chain` — including both
+guards: it refuses to overwrite an existing slot, and refuses a record that does not
+chain to the current head. `RecordStore.status()` replays the chain and reports
+every defect rather than the first.
 
-`Chain`, anchoring, and the record log exist **only in Python**. This is the largest
-single gap between the documentation and the app.
+**Anchoring is still not implemented on either side** — see below.
 
 ### Anchoring — barely implemented
 
@@ -425,8 +426,20 @@ build, which has no OpenCV and no Dart-side camera pipeline equivalent in browse
 | 4 | **Result** | reads the set, taps *Seal record* | none — an abstention seals too | → sealed |
 | 5 | **Record sealed** | reads the digest, taps *Done* | — | → standby |
 
-`DESIGN.md` specifies nine screens. **Five are built.** Setup, quality gate, record
-log, certificate and verifier report are **NOT IMPLEMENTED** in the app.
+All nine screens from `DESIGN.md` are built:
+
+| # | Screen | File |
+|---|---|---|
+| 1 | Standby | `screens.dart::StandbyScreen` |
+| 2 | Setup — reagent declared, case linked | `screens_extra.dart::SetupScreen` |
+| 3 | Capture `1/2` | `screens.dart::CaptureScreen` |
+| 3b | Second view `2/2` | `screens.dart::SecondViewScreen` |
+| 4 | Quality gate, reported **before** the result | `screens_extra.dart::GateScreen` |
+| 5 | Result | `screens.dart::ResultScreen` |
+| 6 | Record sealed | `screens.dart::SealedScreen` |
+| 7 | Record log | `screens_extra.dart::LogScreen` |
+| 8 | §63 certificate + eSakshya envelope | `screens_extra.dart::CertificateScreen` |
+| 9 | Verifier report | `screens_extra.dart::VerifierScreen` |
 
 ---
 
@@ -468,6 +481,9 @@ app/lib/
 ├── src/measure_bridge.dart OnDeviceMeasurer + the dev HTTP bridge
 ├── src/platform_keystore.dart  StrongBox over a method channel
 ├── src/screens.dart       the five screens
+├── src/screens_extra.dart setup, quality gate, log, certificate, verifier report
+├── src/store.dart         RecordStore — the on-device append-only ledger
+├── src/certificate.dart   BSA §63 Part A and the CCTNS-2.0 envelope, in Dart
 ├── src/models.dart        CaptureQuality, TestResult, Liveness, Outcome
 └── src/tokens.dart        design tokens; there is no "success" colour
 
@@ -502,9 +518,10 @@ app/android/.../kotlin/
 | **Print/photo attack detection** | ✔ | **YES** | `parallax.py`, `livenessOnDevice` |
 | **Mock-location detection** | ✔ | **NOT IMPLEMENTED** | `main.dart:194` hardcodes `false` |
 | **GPS / L3 corroboration** | ✔ | **NOT IMPLEMENTED** | `main.dart:282` hardcodes the bundle |
-| **§63 certificate in the app** | ✔ | **NOT IMPLEMENTED** | Python CLI only |
-| **eSakshya handoff in the app** | ✔ | **NOT IMPLEMENTED** | Python CLI only |
-| Record log / export | ✔ | **NOT IMPLEMENTED** | no persistence in `main.dart` |
+| **§63 certificate in the app** | ✔ | **YES** | `app/lib/src/certificate.dart::buildCertificate`, `CertificateScreen` |
+| **eSakshya handoff in the app** | ✔ | **YES** | `certificate.dart::buildEnvelope`, shown on the certificate screen |
+| Record log / persistence | ✔ | **YES** | `app/lib/src/store.dart::RecordStore` — records written to app storage |
+| In-app verifier report | ✔ | **YES** | `VerifierScreen` runs `ftr.verifyRecord` on-device |
 | Trained ML model | — | **Deliberately none** | ablation: the closed-form scorer won |
 | Real reagent calibration | ✔ | **NO** — synthetic loci | `_buildClassifier` |
 
@@ -562,13 +579,13 @@ neither the app nor us.
 1. **Never run on a handset.** Everything is measured on synthetic frames or measured
    spectral data.
 2. **No reagent calibration.** Loci are surrogates; no such dataset is public.
-3. **The app does not persist records.** Chain, certificate and eSakshya handoff are
-   Python-only.
+3. **Anchoring is not real** on either side — a sequence number, no countersignature.
 4. **A synchronised stereo replay defeats the liveness check** — replaying the genuine
    pair reproduces the real parallax.
-5. **Anchoring is not real.** No countersignature, no timestamp authority.
-6. **The attestation chain is not walked to a Google root.**
-7. **No GPS or mock-location detection in the app.**
+5. **The attestation chain is not walked to a Google root.**
+6. **No GPS or mock-location detection in the app** — the location bundle is constant.
+7. **The 196 substrate probes are Python-only**, so the app runs a weaker light-field
+   check.
 
 ---
 
