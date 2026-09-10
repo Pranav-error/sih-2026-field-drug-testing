@@ -19,7 +19,8 @@ from dataclasses import dataclass
 import numpy as np
 
 __all__ = [
-    "srgb_to_linear", "xyz_to_lab", "delta_e_2000", "RootPolynomial",
+    "srgb_to_linear", "linear_to_srgb", "xyz_to_lab", "lab_to_xyz", "lab_to_srgb",
+    "delta_e_2000", "RootPolynomial",
     "ConformalClassifier", "Prediction", "D65",
 ]
 
@@ -48,6 +49,40 @@ def xyz_to_lab(xyz: np.ndarray, white: np.ndarray = D65) -> np.ndarray:
     f = np.where(t > d ** 3, np.cbrt(t), t / (3 * d ** 2) + 4.0 / 29.0)
     fx, fy, fz = f[..., 0], f[..., 1], f[..., 2]
     return np.stack([116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)], axis=-1)
+
+
+def lab_to_xyz(lab: np.ndarray, white: np.ndarray = D65) -> np.ndarray:
+    """Inverse of :func:`xyz_to_lab`."""
+    lab = np.asarray(lab, dtype=float)
+    fy = (lab[..., 0] + 16.0) / 116.0
+    fx = fy + lab[..., 1] / 500.0
+    fz = fy - lab[..., 2] / 200.0
+    f = np.stack([fx, fy, fz], axis=-1)
+    d = 6.0 / 29.0
+    t = np.where(f > d, f ** 3, 3.0 * d * d * (f - 4.0 / 29.0))
+    return t * white
+
+
+def linear_to_srgb(rgb: np.ndarray) -> np.ndarray:
+    """Inverse of :func:`srgb_to_linear`."""
+    rgb = np.clip(np.asarray(rgb, dtype=float), 0.0, 1.0)
+    return np.where(rgb <= 0.0031308, rgb * 12.92,
+                    1.055 * np.power(rgb, 1 / 2.4) - 0.055)
+
+
+def lab_to_srgb(lab: np.ndarray) -> np.ndarray:
+    """Lab* to sRGB in 0..1, clipped to gamut.
+
+    Used to *print* a colour the pipeline will later measure — the demonstration
+    cards, whose well is filled with a known locus. Clipping matters: a locus
+    outside the printer's gamut comes back measurably different, so the caller
+    is told how far the round trip moved rather than being left to assume it
+    did not.
+    """
+    from .pipeline import SRGB_TO_XYZ_D65      # local: pipeline imports us
+    xyz = lab_to_xyz(np.asarray(lab, dtype=float))
+    lin = xyz @ np.linalg.inv(SRGB_TO_XYZ_D65).T
+    return np.clip(linear_to_srgb(lin), 0.0, 1.0)
 
 
 def delta_e_2000(lab1: np.ndarray, lab2: np.ndarray) -> np.ndarray:

@@ -1,0 +1,32 @@
+{
+  "_note": "Surrogate colour ladder for the reference card. NOT reagent chemistry: substituting NCB reagent standards is a data change, not an architecture change, because L1 and L3-L7 are substance-independent by construction.",
+  "_rule": "Every pair must be more than 2x the conformal threshold apart. Two rungs closer together than the threshold make a single label arithmetically impossible: every reading near either falls inside both. Enforced by core/tests/test_loci.py and app/test/measure_bridge_test.dart.",
+  "_provenance": {
+    "negative": "MEASURED. The empty well of the real printed card in dart/ftr_verify/test/fixtures/real_card.jpg reads Lab* [95.52, 0.001, 0.009]. The previous value of L=80.1 was a guess and put a dry well outside its own threshold.",
+    "others": "Surrogate values. Provisional until reagent standards are measured."
+  },
+  "loci_lab": {
+    "opiate_class": [
+      18.4,
+      23.2,
+      -7.5
+    ],
+    "opiate_related": [
+      33.0,
+      46.0,
+      -28.0
+    ],
+    "amphetamine_class": [
+      40.3,
+      14.3,
+      26.4
+    ],
+    "negative": [
+      95.5,
+      0.0,
+      0.0
+    ]
+  },
+  "calibration_sigma_lab": 2.4,
+  "alpha": 0.05
+}

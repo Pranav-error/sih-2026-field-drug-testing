@@ -220,6 +220,31 @@ python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 ./check.sh                                           # everything, both languages
 ```
 
+### Demonstration cards
+
+```sh
+.venv/bin/python -m ftr.printable --demo-set docs/demo-cards --dpi 600
+```
+
+One card per class plus a blank, and `PRINTING.txt`. The well is **printed**
+with a class colour — no reagent, no controlled substance — so a rehearsal can
+show a positive. Each one carries a red banner saying so and `DEMO` in its card
+id, which reaches the record because the operator types it in. A card that could
+pass for an ordinary one is a route to a fabricated positive in a real record.
+
+Two things the cards taught us, both fixed and both tested:
+
+- The banner started **on the card body**, where it covered 30 of the 196
+  substrate probe points and 3 colour patches. The illumination surface and the
+  device transform were solved against a red rectangle; every filled card came
+  back at roughly `Lab (337, −153, −6)` with a failed gate. The banner now sits
+  in its own strip above the card, offset by a **whole** number of pixels, so
+  the card body is bit-identical to a plain card apart from the well — and a
+  test asserts exactly that.
+- **Fold the liveness tab.** An unfolded card is flat, and the two-view check
+  will correctly report `NOT LIVE — scene was flat`. That is the defence
+  working, not a bug.
+
 ### Run it against a real printed card
 
 ```sh

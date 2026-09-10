@@ -1,0 +1,57 @@
+Demonstration cards — printing and shooting
+===========================================
+
+WHAT THESE ARE
+  card-blank.png        an ordinary reference card. An empty well reads
+                        NEGATIVE, which is a real, successful result.
+  card-*.png            demonstration cards. The well is PRINTED with a class
+                        colour. No reagent, no controlled substance. Each one
+                        says so across its face and carries DEMO in its card id.
+
+  A demonstration card produces a record that looks like a positive field test.
+  That is the point, and it is also the risk: type the printed DEMO card id into
+  the app's New test screen so the record itself names the card it read. A
+  record that does not say it came from a demonstration card is the one thing
+  here that could actually mislead somebody.
+
+PRINTING
+  Scale                 100%. Not "fit to page" — the geometry is metric and
+                        the parallax check is in millimetres.
+  Stock                 matte. Gloss puts a specular highlight on the patches
+                        and the illumination gate will refuse the frame.
+  Colour management     OFF. The card IS the colour reference; letting a
+                        printer driver "improve" it defeats the purpose.
+  Ink                   any consumer inkjet or laser is fine. The device
+                        transform is fitted per frame from the printed patches,
+                        so a printer's own bias is corrected, not assumed away.
+
+THE LIVENESS TAB — READ THIS
+  Fold the tab up along the first dashed line and over along the second, so it
+  stands about 8 mm above the card face.
+
+  If you do not fold it, the card is flat, and the two-view check will correctly
+  report NOT LIVE — "scene was flat". That is not a bug. A flat reproduction
+  gives exactly zero parallax at any print quality, which is the whole reason
+  the tab exists. An unfolded demonstration card is indistinguishable from a
+  photograph of a card, and the app is supposed to say so.
+
+SHOOTING
+  1. Lay the card flat under even light. Avoid a single hard lamp or a torch
+     held close — the illumination gate measures non-uniformity and will refuse.
+  2. Frame the whole card, all four corner markers visible.
+  3. Take the first frame.
+  4. Move the phone sideways by about a centimetre. Not up, not closer —
+     sideways. Take the second frame.
+  5. The app reports the parallax it measured against the parallax the geometry
+     predicts for an 8 mm tab.
+
+WHAT TO EXPECT
+  card-blank            negative        single label
+  card-negative         negative        single label
+  card-opiate-class     opiate_class    single label
+  card-opiate-related   opiate_related  single label
+  card-amphetamine-class amphetamine_class  single label
+
+  Every pair of classes is more than twice the abstention threshold apart, so a
+  clean frame of any of these returns one label. If you get two labels, the
+  frame is the problem, not the card — check the light.

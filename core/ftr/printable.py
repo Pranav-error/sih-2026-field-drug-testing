@@ -17,32 +17,89 @@ solved against.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .card import CARD_V1, CardSpec
+from .colorimetry import lab_to_srgb
 
 __all__ = ["render_printable"]
 
 
+SURROGATE_LOCI = Path(__file__).with_name("data") / "surrogate_loci.json"
+
+
+def load_loci() -> dict[str, list[float]]:
+    """The surrogate ladder, from the one file Python and Dart both read."""
+    return json.loads(SURROGATE_LOCI.read_text())["loci_lab"]
+
+
+def identity_band(spec: CardSpec = CARD_V1) -> tuple[float, float]:
+    """The horizontal span, in mm, where the card id may be printed.
+
+    Exposed rather than inlined because the first version of this calculation
+    was duplicated into its own test, and the copy got it wrong in a way the
+    original did not — which is the failure mode the whole one-source-of-truth
+    rule exists to stop, reproduced inside the test meant to enforce it.
+    """
+    x0 = spec.well_centre_mm[0] + spec.well_radius_mm + 2.5
+    # The first marker to the RIGHT of x0. Taking the minimum over all markers
+    # picks the bottom-left one at x=3 and yields a negative width.
+    rights = [ox for ox, _ in spec.marker_origins_mm if ox > x0]
+    x1 = (min(rights) if rights else spec.width_mm) - 1.5
+    return x0, x1
+
+
 def render_printable(spec: CardSpec = CARD_V1, dpi: int = 600, serial: str = "0000",
-                     batch: str = "B00") -> np.ndarray:
-    """Render the card at print resolution, with a quiet zone and its identity."""
+                     batch: str = "B00", well_label: str | None = None) -> np.ndarray:
+    """Render the card at print resolution, with a quiet zone and its identity.
+
+    ``well_label`` fills the reaction well with a locus colour, producing a
+    **demonstration card**: the pipeline reads a printed patch and reports the
+    matching class, so a rehearsal can show a positive without reagents and
+    without a controlled substance.
+
+    Every such card is marked, twice. A demonstration card that could pass for
+    an ordinary one is a route to a fabricated positive in a real record, so the
+    well fill comes with a printed band naming the class, and the card id
+    carries DEMO — which reaches the record, because the operator types it in.
+    """
     ppmm = dpi / 25.4
     quiet_mm = 5.0                      # white margin: ArUco needs one to detect
     tab_extent = 0.0
     if spec.tab_height_mm > 0:
         q = np.array(spec.tab_quad_mm, dtype=float)
         tab_extent = spec.tab_height_mm + float(q[:, 1].max() - q[:, 1].min()) + 8.0
+    # A demonstration card gets a banner strip ABOVE the quiet zone, never on
+    # the card body. The first attempt printed the band across the card at
+    # y=52..60mm, which covered 30 of the 196 substrate probe points and 3 of
+    # the colour patches — the illumination fit and the device transform were
+    # both solved against a red rectangle, and every filled card came back with
+    # a Lab of about (337, -153, -6) and a failed gate. A demonstration card
+    # must differ from an ordinary one in the well and nowhere else.
+    banner_mm = 14.0 if well_label is not None else 0.0
+    # A WHOLE number of pixels, and added to the offset already rounded. If the
+    # strip were 14 mm of fractional pixels, every element on the card would
+    # round to a different subpixel position than on a plain card, and the two
+    # would differ by antialiasing everywhere — which is both an unprovable
+    # claim ("the marking does not touch the measured surface") and a real risk,
+    # because it hides an overlap in a haze of one-pixel noise. With an integer
+    # offset the card body is bit-identical to a plain card except for the well,
+    # and test_demo_cards.py asserts exactly that.
+    banner_px = int(round(banner_mm * ppmm))
+
     w = int(round((spec.width_mm + 2 * quiet_mm) * ppmm))
-    h = int(round((spec.height_mm + tab_extent + 2 * quiet_mm) * ppmm))
+    h = int(round((spec.height_mm + tab_extent + 2 * quiet_mm) * ppmm)) + banner_px
     img = np.full((h, w, 3), 255, dtype=np.uint8)
-    off = quiet_mm * ppmm
+    off_x = quiet_mm * ppmm
+    off_y = quiet_mm * ppmm
 
     def px(mm_x, mm_y):
-        return int(round(off + mm_x * ppmm)), int(round(off + mm_y * ppmm))
+        return (int(round(off_x + mm_x * ppmm)),
+                int(round(off_y + mm_y * ppmm)) + banner_px)
 
     # card body, very slightly off-white so the trim edge is visible when cut
     cv2.rectangle(img, px(0, 0), px(spec.width_mm, spec.height_mm), (247, 247, 247), -1)
@@ -53,8 +110,18 @@ def render_printable(spec: CardSpec = CARD_V1, dpi: int = 600, serial: str = "00
         cv2.rectangle(img, px(cx - half, cy - half), px(cx + half, cy + half), bgr, -1)
 
     # reaction well: an outline, not a fill. The strip sits here, and anything
-    # printed under it would contaminate the sample the pipeline reads.
+    # printed under it would contaminate the sample the pipeline reads. The one
+    # exception is a demonstration card, which is labelled as such on its face.
     wx, wy = spec.well_centre_mm
+    if well_label is not None:
+        loci = load_loci()
+        if well_label not in loci:
+            raise SystemExit(f"unknown class {well_label!r}; "
+                             f"choose from {', '.join(sorted(loci))}")
+        rgb = lab_to_srgb(np.array(loci[well_label], dtype=float))
+        bgr = tuple(int(round(c * 255)) for c in rgb[::-1])
+        cv2.circle(img, px(wx, wy),
+                   int(round((spec.well_radius_mm - 0.4) * ppmm)), bgr, -1)
     cv2.circle(img, px(wx, wy), int(round(spec.well_radius_mm * ppmm)), (170, 170, 170),
                max(1, int(round(0.3 * ppmm))))
     cv2.circle(img, px(wx, wy), int(round((spec.well_radius_mm + 1.2) * ppmm)), (210, 210, 210),
@@ -67,12 +134,52 @@ def render_printable(spec: CardSpec = CARD_V1, dpi: int = 600, serial: str = "00
         x, y = px(ox, oy)
         img[y:y + side, x:x + side] = m[..., None].repeat(3, axis=2)
 
-    card_id = f"{spec.card_id_prefix}-{serial}"
     scale = ppmm / 12.0
-    cv2.putText(img, card_id, px(21, 68), cv2.FONT_HERSHEY_SIMPLEX, scale, (90, 90, 90),
+    card_id = f"{spec.card_id_prefix}-{serial}"
+    if well_label is not None:
+        cv2.rectangle(img, px(0, -banner_mm + 1.0), px(spec.width_mm, -2.0),
+                      (60, 60, 200), -1)
+        cv2.putText(img, "DEMONSTRATION CARD - PRINTED WELL, NO REAGENT",
+                    px(2.0, -banner_mm + 5.6), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale * 0.62, (255, 255, 255),
+                    max(1, int(round(0.15 * ppmm))), cv2.LINE_AA)
+        cv2.putText(img, f"expected result: {well_label}   -   enter card id "
+                    f"{card_id} in the app",
+                    px(2.0, -banner_mm + 9.6), cv2.FONT_HERSHEY_SIMPLEX,
+                    scale * 0.46, (235, 235, 255),
+                    max(1, int(round(0.10 * ppmm))), cv2.LINE_AA)
+    # The identity block goes to the RIGHT of the well, between it and the
+    # corner marker. Three constraints, and the original position violated two:
+    #
+    #   x < 40.8   the folded liveness tab lands on (21..40, 66..80), so text
+    #              there is hidden the moment the card is used as intended
+    #   x < 17     the bottom-left ArUco marker occupies (3..17, 63..77), and a
+    #              fiducial with lettering across it may not decode at all
+    #   40.8..59.2 the well
+    #
+    # That leaves 59.2..83. Auto-fit rather than assume: a demonstration card's
+    # serial is longer than a plain one's, which is how the text ended up over
+    # the marker in the first place.
+    id_x0, id_x1 = identity_band(spec)
+
+    def fitted(text: str, base: float, thick_mm: float) -> float:
+        """Largest scale at or below ``base`` that keeps ``text`` inside."""
+        avail = (id_x1 - id_x0) * ppmm
+        sc = base
+        while sc > 0.05:
+            (tw, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, sc,
+                                         max(1, int(round(thick_mm * ppmm))))
+            if tw <= avail:
+                return sc
+            sc *= 0.94
+        return sc
+
+    cv2.putText(img, card_id, px(id_x0, 69), cv2.FONT_HERSHEY_SIMPLEX,
+                fitted(card_id, scale, 0.18), (90, 90, 90),
                 max(1, int(round(0.18 * ppmm))), cv2.LINE_AA)
-    cv2.putText(img, f"batch {batch}  /  matte  /  no colour management",
-                px(21, 74), cv2.FONT_HERSHEY_SIMPLEX, scale * 0.62, (140, 140, 140),
+    sub = f"batch {batch}  /  matte  /  no colour management"
+    cv2.putText(img, sub, px(id_x0, 74), cv2.FONT_HERSHEY_SIMPLEX,
+                fitted(sub, scale * 0.62, 0.12), (140, 140, 140),
                 max(1, int(round(0.12 * ppmm))), cv2.LINE_AA)
 
     # The liveness flap, printed below the card and folded up and back over it.
@@ -121,17 +228,119 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--dpi", type=int, default=600)
     p.add_argument("--serial", default="0000", help="per-card serial, printed on the card")
     p.add_argument("--batch", default="B00", help="print batch id — goes in every record")
+    p.add_argument("--well", default=None,
+                   help="fill the well with this class colour, making a "
+                        "DEMONSTRATION card (no reagent). "
+                        f"one of: {', '.join(sorted(load_loci()))}")
+    p.add_argument("--demo-set", type=Path, default=None,
+                   help="write one demonstration card per class into this "
+                        "directory, plus a blank one, and a printing guide")
     a = p.parse_args(argv)
 
-    img = render_printable(dpi=a.dpi, serial=a.serial, batch=a.batch)
+    if a.demo_set is not None:
+        return _write_demo_set(a.demo_set, a.dpi, a.batch)
+
+    serial = a.serial if a.well is None else f"DEMO-{a.well[:6].upper()}"
+    img = render_printable(dpi=a.dpi, serial=serial, batch=a.batch,
+                           well_label=a.well)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(a.out), img)
     h, w = img.shape[:2]
     print(f"{a.out}  {w}x{h}px at {a.dpi} dpi  "
           f"({w / a.dpi * 25.4:.0f} x {h / a.dpi * 25.4:.0f} mm including quiet zone)")
-    print(f"card id {CARD_V1.card_id_prefix}-{a.serial}, batch {a.batch}")
+    print(f"card id {CARD_V1.card_id_prefix}-{serial}, batch {a.batch}")
+    if a.well is not None:
+        print(f"DEMONSTRATION card: the well is printed {a.well}, not reacted.")
     print("Print at 100% scale, matte stock, colour management OFF.")
     return 0
+
+
+def _write_demo_set(out_dir: Path, dpi: int, batch: str) -> int:
+    """One card per class, plus a blank, plus the guide that goes with them."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+
+    blank = out_dir / "card-blank.png"
+    cv2.imwrite(str(blank), render_printable(dpi=dpi, serial="0417", batch=batch))
+    written.append((blank, "an ordinary card — an empty well reads negative"))
+
+    for label in sorted(load_loci()):
+        f = out_dir / f"card-{label.replace('_', '-')}.png"
+        cv2.imwrite(str(f), render_printable(
+            dpi=dpi, serial=f"DEMO-{label[:6].upper()}", batch=batch,
+            well_label=label))
+        written.append((f, f"demonstration card, well printed {label}"))
+
+    (out_dir / "PRINTING.txt").write_text(_PRINTING_GUIDE)
+    written.append((out_dir / "PRINTING.txt", "how to print and shoot these"))
+
+    for f, note in written:
+        print(f"  {f.name:34s} {note}")
+    print(f"\n{len(written)} files in {out_dir}")
+    print("Read PRINTING.txt before printing — scale and colour management "
+          "matter more than the printer does.")
+    return 0
+
+
+_PRINTING_GUIDE = """\
+Demonstration cards — printing and shooting
+===========================================
+
+WHAT THESE ARE
+  card-blank.png        an ordinary reference card. An empty well reads
+                        NEGATIVE, which is a real, successful result.
+  card-*.png            demonstration cards. The well is PRINTED with a class
+                        colour. No reagent, no controlled substance. Each one
+                        says so across its face and carries DEMO in its card id.
+
+  A demonstration card produces a record that looks like a positive field test.
+  That is the point, and it is also the risk: type the printed DEMO card id into
+  the app's New test screen so the record itself names the card it read. A
+  record that does not say it came from a demonstration card is the one thing
+  here that could actually mislead somebody.
+
+PRINTING
+  Scale                 100%. Not "fit to page" — the geometry is metric and
+                        the parallax check is in millimetres.
+  Stock                 matte. Gloss puts a specular highlight on the patches
+                        and the illumination gate will refuse the frame.
+  Colour management     OFF. The card IS the colour reference; letting a
+                        printer driver "improve" it defeats the purpose.
+  Ink                   any consumer inkjet or laser is fine. The device
+                        transform is fitted per frame from the printed patches,
+                        so a printer's own bias is corrected, not assumed away.
+
+THE LIVENESS TAB — READ THIS
+  Fold the tab up along the first dashed line and over along the second, so it
+  stands about 8 mm above the card face.
+
+  If you do not fold it, the card is flat, and the two-view check will correctly
+  report NOT LIVE — "scene was flat". That is not a bug. A flat reproduction
+  gives exactly zero parallax at any print quality, which is the whole reason
+  the tab exists. An unfolded demonstration card is indistinguishable from a
+  photograph of a card, and the app is supposed to say so.
+
+SHOOTING
+  1. Lay the card flat under even light. Avoid a single hard lamp or a torch
+     held close — the illumination gate measures non-uniformity and will refuse.
+  2. Frame the whole card, all four corner markers visible.
+  3. Take the first frame.
+  4. Move the phone sideways by about a centimetre. Not up, not closer —
+     sideways. Take the second frame.
+  5. The app reports the parallax it measured against the parallax the geometry
+     predicts for an 8 mm tab.
+
+WHAT TO EXPECT
+  card-blank            negative        single label
+  card-negative         negative        single label
+  card-opiate-class     opiate_class    single label
+  card-opiate-related   opiate_related  single label
+  card-amphetamine-class amphetamine_class  single label
+
+  Every pair of classes is more than twice the abstention threshold apart, so a
+  clean frame of any of these returns one label. If you get two labels, the
+  frame is the problem, not the card — check the light.
+"""
 
 
 if __name__ == "__main__":
