@@ -26,7 +26,20 @@ const goodPosture = DevicePosture(
   mockLocation: false,
   recordCount: 47,
   unanchored: 4,
-  sinceAnchor: Duration(hours: 3, minutes: 12),
+  lastAnchorAt: null,
+);
+
+/// What a genuine StrongBox handset actually reports: the key is in hardware,
+/// and the boot state is deferred to the attestation certificate.
+const realHandsetPosture = DevicePosture(
+  securityLevel: 'STRONGBOX',
+  verifiedBootState: 'IN ATTESTATION',
+  bootloaderLocked: null,
+  osPatchLevel: 'IN ATTESTATION',
+  mockLocation: null,
+  recordCount: 3,
+  unanchored: 3,
+  lastAnchorAt: null,
 );
 
 const devPosture = DevicePosture(
@@ -37,7 +50,7 @@ const devPosture = DevicePosture(
   mockLocation: false,
   recordCount: 2,
   unanchored: 2,
-  sinceAnchor: Duration(minutes: 4),
+  lastAnchorAt: null,
 );
 
 TestResult result(List<String> set, {String? label, List<String> refusals = const []}) =>
@@ -197,12 +210,66 @@ void main() {
     test('evidence grade needs hardware AND verified boot AND a locked bootloader', () {
       expect(goodPosture.evidenceGrade, isTrue);
       expect(devPosture.evidenceGrade, isFalse);
+      // The app cannot establish boot state, so a real handset never reaches it.
+      expect(realHandsetPosture.evidenceGrade, isFalse);
+    });
+
+    testWidgets('a StrongBox handset is NEVER told it uses a software key',
+        (t) async {
+      // The bug this pins: the warning keyed off evidenceGrade, which is false
+      // on real hardware because verified boot reads IN ATTESTATION rather than
+      // GREEN. A genuine StrongBox device was told its records were for
+      // development only.
+      await t.pumpWidget(wrap(const StandbyScreen(posture: realHandsetPosture)));
+      expect(find.textContaining('software key'), findsNothing);
+      expect(find.textContaining('never be presented as evidence'), findsNothing);
+      expect(find.text('STRONGBOX'), findsWidgets);
+      // What it says instead: where the answer actually lives.
+      expect(find.textContaining('attestation certificate'), findsOneWidget);
+    });
+
+    testWidgets('an UNKNOWN security level is not announced as a software key',
+        (t) async {
+      // reportedLevel() returns UNKNOWN whenever the KeyInfo lookup throws — a
+      // StrongBox key can land here. Calling that a development key is the same
+      // false statement, one branch over.
+      const unknown = DevicePosture(
+        securityLevel: 'UNKNOWN',
+        verifiedBootState: 'IN ATTESTATION',
+        bootloaderLocked: null,
+        osPatchLevel: 'IN ATTESTATION',
+        mockLocation: null,
+        recordCount: 0,
+        unanchored: 0,
+        lastAnchorAt: null,
+      );
+      expect(unknown.usesSoftwareKey, isFalse);
+      expect(unknown.securityLevelUnknown, isTrue);
+      await t.pumpWidget(wrap(const StandbyScreen(posture: unknown)));
+      expect(find.textContaining('never be presented as evidence'), findsNothing);
+      expect(find.textContaining('did not report what backs'), findsOneWidget);
+    });
+
+    testWidgets('a genuine software build is still warned about', (t) async {
+      expect(devPosture.usesSoftwareKey, isTrue);
+      await t.pumpWidget(wrap(const StandbyScreen(posture: devPosture)));
+      expect(find.textContaining('never be presented as evidence'), findsOneWidget);
+    });
+
+    testWidgets('nothing unknown is rendered as a finding', (t) async {
+      await t.pumpWidget(wrap(const StandbyScreen(posture: realHandsetPosture)));
+      // "Off" would be a claim about a check that never ran.
+      expect(find.text('Not checked yet'), findsOneWidget);
+      expect(find.text('Off'), findsNothing);
+      // The bootloader is not asserted LOCKED on the app's say-so.
+      expect(find.text('LOCKED'), findsNothing);
     });
 
     testWidgets('the anchoring debt is on the home screen', (t) async {
       await t.pumpWidget(wrap(const StandbyScreen(posture: goodPosture)));
-      expect(find.text('3h 12m'), findsOneWidget);
       expect(find.textContaining('Awaiting anchor'), findsOneWidget);
+      // Never anchored must read as never anchored, not as a duration.
+      expect(find.text('never anchored'), findsOneWidget);
     });
   });
 

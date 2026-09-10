@@ -22,6 +22,9 @@ class PlatformKeystore implements ftr.Keystore {
 
   static const _channel = MethodChannel('in.gov.ncb.sih26231/keystore');
 
+  /// Why [open] last returned null. Null when it has not failed.
+  static String? lastFailure;
+
   final String _level;
   final List<Uint8List> _chain;
   final Uint8List _publicKeyDer;
@@ -39,6 +42,7 @@ class PlatformKeystore implements ftr.Keystore {
   /// fall back to a development key **and say so**, rather than silently
   /// producing records that look stronger than they are.
   static Future<PlatformKeystore?> open({Uint8List? challenge}) async {
+    lastFailure = null;
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>('prepare', {
         'challenge': base64Encode(
@@ -55,10 +59,18 @@ class PlatformKeystore implements ftr.Keystore {
         base64Decode(res['publicKeyDer'] as String),
         res['note'] as String? ?? '',
       );
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      // The reason must survive. Returning a bare null makes the app fall back
+      // to a development key correctly but silently, and an operator staring at
+      // SOFTWARE has no way to learn why — the same silence that hid an
+      // InvalidKeyException in the signing path for two builds.
+      lastFailure = 'Hardware keystore unavailable: '
+          '${e.code} ${e.message ?? ''} ${e.details ?? ''}'.trim();
       return null;
     } on MissingPluginException {
-      return null;   // web, or a platform with no keystore channel
+      lastFailure = 'No keystore channel on this platform (web, or a build '
+          'without the Android host).';
+      return null;
     }
   }
 

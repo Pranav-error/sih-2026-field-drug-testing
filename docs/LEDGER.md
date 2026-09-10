@@ -111,9 +111,13 @@ clock, and an offline handset cannot be contradicted.
 So `captured_at` is reported by both verifiers as a *claim*, never as proven.
 
 What bounds the lie is anchoring. `RecordStore.anchor(sequence)` writes an
-`ANCHOR` file, and `unanchored` reports how many records have never been
-witnessed outside the device — the width of the window in which a timestamp
-could have been fabricated. The Handoff screen shows that number.
+`ANCHOR` file — the sequence on the first line, the UTC time on the second, two
+lines rather than JSON so a person with `cat` understands it and so a file from
+an older build still parses. `unanchored` reports how many records have never
+been witnessed outside the device — the width of the window in which a timestamp
+could have been fabricated — and `lastAnchorAt` gives how long that window has
+been open. A chain that has never been anchored reads **"never anchored"**, not
+a duration. Both numbers are on the standby screen and the Handoff screen.
 
 **Exporting is what anchors.** Once a bundle leaves the handset, rewriting those
 records is contradicted by a copy the app cannot reach. That is a **weaker**

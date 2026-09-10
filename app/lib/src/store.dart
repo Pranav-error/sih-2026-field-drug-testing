@@ -81,10 +81,30 @@ class RecordStore {
 
   File get _anchorFile => File('${_dir.path}/ANCHOR');
 
+  /// `<sequence>` on the first line, `<iso8601 utc>` on the second.
+  ///
+  /// Two lines rather than JSON so a person looking at the file with `cat`
+  /// understands it, and so a file written by an older build (sequence only)
+  /// still parses.
+  List<String> get _anchorLines => _anchorFile.existsSync()
+      ? _anchorFile.readAsStringSync().trim().split('\n')
+      : const [];
+
   /// Sequence witnessed by something outside this handset, or null if none is.
   int? get lastAnchor {
-    if (!_anchorFile.existsSync()) return null;
-    return int.tryParse(_anchorFile.readAsStringSync().trim());
+    final l = _anchorLines;
+    return l.isEmpty ? null : int.tryParse(l.first.trim());
+  }
+
+  /// When that witnessing happened, or null if it never did.
+  ///
+  /// The device's own clock, so it is a claim like every other timestamp here —
+  /// but a claim bounded by the export it records, which is the point of
+  /// anchoring at all.
+  DateTime? get lastAnchorAt {
+    final l = _anchorLines;
+    if (l.length < 2) return null;
+    return DateTime.tryParse(l[1].trim())?.toUtc();
   }
 
   /// How many sealed records have never been witnessed outside this device.
@@ -100,7 +120,8 @@ class RecordStore {
   /// records is contradicted by a copy the app does not control. That is a
   /// weaker anchor than a countersigning service and it is labelled as such
   /// everywhere it is reported — but it is real, and it needs no network.
-  void anchor(int sequence) => _anchorFile.writeAsStringSync('$sequence');
+  void anchor(int sequence) => _anchorFile.writeAsStringSync(
+      '$sequence\n${DateTime.now().toUtc().toIso8601String()}\n');
 
   List<ftr.SealedRecord> records() => _files
       .map((f) => ftr.SealedRecord.fromEnvelope(f.readAsBytesSync()))

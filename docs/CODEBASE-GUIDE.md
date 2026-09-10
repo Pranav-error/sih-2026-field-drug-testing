@@ -106,9 +106,10 @@ was. It is what kind of device produced this.
 |---|---|
 | Security level (STRONGBOX / TEE / SOFTWARE) | **Yes** — `KeyInfo.getSecurityLevel()` |
 | Verified boot / bootloader | Displays `IN ATTESTATION` — deliberately not asserted by the app; see §5 |
-| Mock location | **Yes** — `location.dart` surfaces `Position.isMocked` as a spoof indicator |
+| Mock location | **In the record, yes** — `location.dart` surfaces `Position.isMocked`. On this screen it reads *Not checked yet* until a position has been read, because the check needs the permission prompt and does not run at launch |
 | Records on device | **Yes** — `RecordStore.length`, read off the filesystem |
-| Anchor window | **Yes** — `RecordStore.unanchored`, from the `ANCHOR` file; see `LEDGER.md` §3 |
+| Anchor window | **Yes** — `RecordStore.unanchored` and `lastAnchorAt`, from the `ANCHOR` file; reads *never anchored* rather than a fabricated duration. See `LEDGER.md` §3 |
+| Bootloader / verified boot | **Deliberately not asserted** — both read IN ATTESTATION. The values are in the certificate and the verifier reads them there |
 
 ### Step 2 — the chemistry
 

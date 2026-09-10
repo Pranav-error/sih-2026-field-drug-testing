@@ -92,6 +92,33 @@ void main() {
           reason: st.breaks.join('; '));
     });
 
+    test('an anchor records when it happened, not only how far it reached', () {
+      final c = _chain(2);
+      addTearDown(() => c.dir.deleteSync(recursive: true));
+      expect(c.store.lastAnchorAt, isNull);
+
+      final before = DateTime.now().toUtc();
+      c.store.anchor(1);
+      final at = c.store.lastAnchorAt;
+
+      expect(at, isNotNull);
+      expect(at!.isBefore(before.subtract(const Duration(seconds: 5))), isFalse);
+      expect(c.store.lastAnchor, 1);
+    });
+
+    test('an ANCHOR file written by an older build still parses', () {
+      // Older builds wrote the sequence alone. Failing to read it would make a
+      // witnessed chain look unwitnessed after an update — an anchor silently
+      // lost is worse than one never made.
+      final c = _chain(2);
+      addTearDown(() => c.dir.deleteSync(recursive: true));
+      File('${c.store.path}/ANCHOR').writeAsStringSync('1');
+
+      expect(c.store.lastAnchor, 1);
+      expect(c.store.lastAnchorAt, isNull);
+      expect(c.store.unanchored, 0);
+    });
+
     test('unanchored counts every record until something witnesses them', () {
       final c = _chain(3);
       addTearDown(() => c.dir.deleteSync(recursive: true));

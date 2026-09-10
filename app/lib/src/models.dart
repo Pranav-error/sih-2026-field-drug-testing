@@ -151,12 +151,26 @@ class TestResult {
 class DevicePosture {
   final String securityLevel;
   final String verifiedBootState;
-  final bool bootloaderLocked;
+
+  /// Null when the app has not been told, which on a real handset is always:
+  /// the authoritative value lives in the attestation certificate and the
+  /// verifier reads it from there. The app asserting it would be trusting
+  /// exactly the software whose integrity is in question — the same reason
+  /// [verifiedBootState] reports IN ATTESTATION.
+  final bool? bootloaderLocked;
+
   final String osPatchLevel;
-  final bool mockLocation;
+
+  /// Null until a position has actually been read. Not false — "off" is a
+  /// finding, and claiming it before looking is the fabricated-bundle mistake
+  /// in a smaller box.
+  final bool? mockLocation;
+
   final int recordCount;
   final int unanchored;
-  final Duration sinceAnchor;
+
+  /// When the chain was last witnessed off-device, or null if it never was.
+  final DateTime? lastAnchorAt;
 
   const DevicePosture({
     required this.securityLevel,
@@ -166,19 +180,48 @@ class DevicePosture {
     required this.mockLocation,
     required this.recordCount,
     required this.unanchored,
-    required this.sinceAnchor,
+    required this.lastAnchorAt,
   });
 
-  /// True when the device can produce records worth presenting as evidence.
-  /// A development build is honestly not one.
+  /// The key is in secure hardware. This is the app's own question to answer,
+  /// and it is separate from whether the *device* is trustworthy.
+  bool get hardwareBacked =>
+      securityLevel == 'STRONGBOX' || securityLevel == 'TEE';
+
+  /// A development key — established, not inferred from absence.
+  ///
+  /// Deliberately not `!hardwareBacked`. Android reports UNKNOWN when it cannot
+  /// answer, which is not the same as answering SOFTWARE: a key sitting in
+  /// StrongBox whose `KeyInfo` lookup threw would otherwise be announced to the
+  /// operator as a development key. Records it produces must never be presented
+  /// as evidence, and both verifiers fail them.
+  bool get usesSoftwareKey => securityLevel == 'SOFTWARE';
+
+  /// Android would not say what backs the key. Neither a pass nor a failure.
+  bool get securityLevelUnknown => !hardwareBacked && !usesSoftwareKey;
+
+  /// True only when every part has been *established*, which the app alone
+  /// cannot do.
+  ///
+  /// Kept deliberately strict, and deliberately no longer wired to the
+  /// software-key warning. It used to be: on a genuine StrongBox handset
+  /// [verifiedBootState] is IN ATTESTATION rather than GREEN, so this returned
+  /// false, and the standby screen told the operator their StrongBox device was
+  /// signing with a software key. A true statement about *this* getter,
+  /// presented as a false statement about the hardware.
   bool get evidenceGrade =>
-      (securityLevel == 'STRONGBOX' || securityLevel == 'TEE') &&
-      verifiedBootState == 'GREEN' &&
-      bootloaderLocked;
+      hardwareBacked && verifiedBootState == 'GREEN' && bootloaderLocked == true;
+
+  /// How long the chain has been unwitnessed, or null if it never was witnessed.
+  Duration? get sinceAnchor => lastAnchorAt == null
+      ? null
+      : DateTime.now().toUtc().difference(lastAnchorAt!);
 
   String get anchorWindow {
-    final h = sinceAnchor.inHours;
-    final m = sinceAnchor.inMinutes % 60;
+    final d = sinceAnchor;
+    if (d == null) return unanchored == 0 ? 'no records yet' : 'never anchored';
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
     return h > 0 ? '${h}h ${m}m' : '${m}m';
   }
 }

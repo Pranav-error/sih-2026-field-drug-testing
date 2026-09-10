@@ -130,6 +130,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
   String? _sealError;
   bool _storedOk = false;
   String? _storeError;
+
+  /// Set the first time a real position is read. Stays null before that: "off"
+  /// is a finding, and claiming it before looking is a fabricated value.
+  bool? _mockLocationSeen;
   PlatformKeystore? _hardware;
   String _keystoreNote = '';
 
@@ -216,14 +220,18 @@ class _CaptureFlowState extends State<CaptureFlow> {
         verifiedBootState: _hardware != null
             ? 'IN ATTESTATION'
             : _software.attestation().verifiedBootState,
-        bootloaderLocked: _hardware != null,
+        // Not the app's to assert — same reason as verified boot above. It is
+        // inside the attestation certificate, which ships with every record.
+        bootloaderLocked: null,
         osPatchLevel: _hardware != null
             ? 'IN ATTESTATION'
             : _software.attestation().osPatchLevel,
-        mockLocation: false,
+        // Null until a position has actually been read, which needs the
+        // permission prompt and so does not happen at launch.
+        mockLocation: _mockLocationSeen,
         recordCount: _store?.length ?? _sequence,
-        unanchored: _store?.length ?? _sequence,
-        sinceAnchor: Duration(minutes: 4 * _sequence),
+        unanchored: _store?.unanchored ?? _sequence,
+        lastAnchorAt: _store?.lastAnchorAt,
       );
 
   @override
@@ -274,7 +282,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
     if (!mounted) return;
     setState(() {
       _hardware = ks;
-      _keystoreNote = ks?.note ?? '';
+      // A hardware keystore that failed says why. Falling back to a
+      // development key silently is how an operator ends up unable to explain
+      // a SOFTWARE record in court.
+      _keystoreNote = ks?.note ?? PlatformKeystore.lastFailure ?? '';
     });
   }
 
@@ -325,6 +336,9 @@ class _CaptureFlowState extends State<CaptureFlow> {
     final shown = _live?.result ?? _result;
     // Read the position at the moment of sealing, not at app start.
     final fix = await LocationReader.read();
+    // Now the standby screen can stop saying "not checked yet" about a thing
+    // that has been checked.
+    _mockLocationSeen = fix.mocked;
     final frame = _frameA;
     if (frame == null) {
       throw StateError('no captured frame to seal — capture one first');

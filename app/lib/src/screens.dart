@@ -44,7 +44,10 @@ class StandbyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hw = posture.evidenceGrade;
+    // The chip and the warning key off whether the KEY is in hardware, which
+    // the app can answer. Whether the DEVICE is trustworthy is a separate
+    // question, answered from the attestation certificate by the verifier.
+    final hw = posture.hardwareBacked;
     return AppScaffold(
       title: 'Ready',
       chip: StateChip(
@@ -58,21 +61,48 @@ class StandbyScreen extends StatelessWidget {
               tone: hw ? Tokens.negative : Tokens.abstain),
           Measured('Verified boot', posture.verifiedBootState,
               tone: posture.verifiedBootState == 'GREEN' ? Tokens.negative : Tokens.abstain),
-          Measured('Bootloader', posture.bootloaderLocked ? 'LOCKED' : 'UNLOCKED',
-              tone: posture.bootloaderLocked ? Tokens.negative : Tokens.abstain),
+          Measured(
+              'Bootloader',
+              posture.bootloaderLocked == null
+                  ? 'IN ATTESTATION'
+                  : (posture.bootloaderLocked! ? 'LOCKED' : 'UNLOCKED'),
+              tone: posture.bootloaderLocked == true
+                  ? Tokens.negative
+                  : Tokens.abstain),
           Measured('OS patch level', posture.osPatchLevel),
-          Measured('Mock location', posture.mockLocation ? 'ON' : 'Off',
-              tone: posture.mockLocation ? Tokens.abstain : Tokens.negative),
+          Measured(
+              'Mock location',
+              posture.mockLocation == null
+                  ? 'Not checked yet'
+                  : (posture.mockLocation! ? 'ON' : 'Off'),
+              tone: posture.mockLocation == false
+                  ? Tokens.negative
+                  : Tokens.abstain),
         ]),
         if (keystoreNote != null && keystoreNote!.isNotEmpty)
           PresumptiveNotice(detail: keystoreNote!),
         if (keystoreNote != null && keystoreNote!.isNotEmpty)
           const SizedBox(height: 12),
-        if (!hw)
+        if (posture.usesSoftwareKey)
           const PresumptiveNotice(
             detail: 'This build signs with a software key. Records it produces are '
                 'for development only and will fail verification. They must never be '
                 'presented as evidence.',
+          ),
+        if (posture.securityLevelUnknown)
+          const PresumptiveNotice(
+            detail: 'Android did not report what backs this signing key. That is '
+                'not the same as a software key, and it is not a pass either — '
+                'the attestation certificate shipped with each record is '
+                'authoritative, and the verifier reads the level from there.',
+          ),
+        if (posture.hardwareBacked && !posture.evidenceGrade)
+          const PresumptiveNotice(
+            detail: 'The key is in secure hardware. Whether this device booted '
+                'unmodified is not the app\'s to assert — it is inside the '
+                'attestation certificate, which ships with every record. The '
+                'verifier reads it there, and fails a record that claims more '
+                'than its certificate attests.',
           ),
         const SizedBox(height: 12),
         Panel(title: 'Measurement pipeline', children: [
