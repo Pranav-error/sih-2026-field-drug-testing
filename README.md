@@ -109,6 +109,14 @@ the claim is: *at risk level α, on exchangeable data, the true label is in the 
 at least 1−α of the time.* That sentence survives cross-examination. "The model was
 87% confident" does not.
 
+**This puts a requirement on the reference ladder that is easy to miss.** If two
+loci are closer together than the threshold, every reading near either falls
+inside both and a single label becomes arithmetically impossible — the classifier
+returns two labels forever and looks like a broken scanner. Ours did exactly that
+for a while, with `opiate_class` and `opiate_related` 3.33 ΔE apart against a 5.53
+threshold. Every pair is now more than 2× the threshold apart and a test enforces
+it. The story is in [`ROBUSTNESS.md`](docs/ROBUSTNESS.md).
+
 ### 5. Liveness — the two frames earn their keep
 
 Two views of a plane are related exactly by a homography. Rectify both frames on

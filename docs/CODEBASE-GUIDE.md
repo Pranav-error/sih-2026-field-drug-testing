@@ -531,7 +531,8 @@ app/android/.../kotlin/
 | Record log / persistence | ✔ | **YES** | `app/lib/src/store.dart::RecordStore` — records written to app storage |
 | In-app verifier report | ✔ | **YES** | `VerifierScreen` runs `ftr.verifyRecord` on-device |
 | Trained ML model | — | **Deliberately none** | ablation: the closed-form scorer won |
-| Real reagent calibration | ✔ | **NO** — synthetic loci | `_buildClassifier` |
+| Real reagent calibration | ✔ | **NO** — surrogate loci, but now separable and anchored to the real card's measured substrate | `measure_bridge.dart::referenceLoci` |
+| **Result screen without a measurement** | — | **Fixed** — was a hardcoded constant shown on every failed scan | `ResultScreen`, `main.dart` |
 
 ---
 

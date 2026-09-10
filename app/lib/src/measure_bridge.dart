@@ -48,9 +48,11 @@ class Measurement {
   static const unavailable = Measurement(
     detected: false,
     fiducials: 0,
-    guidance: 'Measure bridge not running — start core/tools/measure_server.py',
+    // The measure bridge and its server were deleted when L1 moved on-device;
+    // this is now what a decode or pipeline failure looks like.
+    guidance: 'The frame could not be read. Retake it.',
     gatePassed: false,
-    refusals: ['the measure bridge is not reachable'],
+    refusals: ['the frame could not be decoded or measured on this device'],
     quality: CaptureQuality(
         fiducialsFound: 0, illumination: 0, focus: 0,
         tiltDegrees: 90, clippedFraction: 0),
@@ -61,11 +63,33 @@ class Measurement {
 ///
 /// Substituting NCB reagent standards is a data change, not an architecture
 /// change — L1 and L3 to L7 are substance-independent by construction.
-final _loci = <String, List<double>>{
+///
+/// Two of these were guesses that made the classifier unusable, and both were
+/// corrected against measurement rather than by taste:
+///
+/// **negative** was at L=80.1. The real printed card's empty well measures
+/// L=95.5 (`test/fixtures/real_card.jpg`, ΔE 0.01 from the value below). At
+/// 80.1 a dry well scored 11.25 from its own class and fell outside the
+/// threshold, so a blank card returned an EMPTY prediction set — reported to the
+/// operator as "inconclusive" when the correct answer was a clean *negative*.
+///
+/// **opiate_related** sat 3.33 from `opiate_class` while the abstention
+/// threshold is 5.53. Any reading near either was inside both, so a single
+/// label was arithmetically impossible: at the calibration's own scatter, a
+/// clean read returned one label about one time in nine. The classifier was not
+/// broken — it was correctly refusing to separate classes the ladder does not
+/// separate. A surrogate ladder whose rungs are closer together than the
+/// threshold cannot be used to demonstrate anything.
+///
+/// The rule this ladder now obeys: **every pair is more than 2× the threshold
+/// apart** (minimum 15.87 against a threshold of 5.53), so a reading near a
+/// rung falls inside exactly one. `measure_bridge_test.dart` enforces it, and
+/// will fail if a future locus is added too close to an existing one.
+final Map<String, List<double>> referenceLoci = <String, List<double>>{
   'opiate_class': [18.4, 23.2, -7.5],
-  'opiate_related': [22.1, 20.4, -4.8],
+  'opiate_related': [33.0, 46.0, -28.0],
   'amphetamine_class': [40.3, 14.3, 26.4],
-  'negative': [80.1, -1.2, 5.9],
+  'negative': [95.5, 0.0, 0.0],
 };
 
 ftr.ConformalClassifier _buildClassifier() {
@@ -80,13 +104,13 @@ ftr.ConformalClassifier _buildClassifier() {
 
   final labs = <List<double>>[];
   final labels = <String>[];
-  for (final e in _loci.entries) {
+  for (final e in referenceLoci.entries) {
     for (var i = 0; i < 200; i++) {
       labs.add(List<double>.generate(3, (k) => e.value[k] + gauss() * 2.4));
       labels.add(e.key);
     }
   }
-  return ftr.ConformalClassifier(_loci, alpha: 0.05)..calibrate(labs, labels);
+  return ftr.ConformalClassifier(referenceLoci, alpha: 0.05)..calibrate(labs, labels);
 }
 
 /// Measures a frame **on the device**, in pure Dart, with no network.
@@ -103,6 +127,11 @@ class OnDeviceMeasurer {
   bool _busy = false;
 
   double get threshold => _classifier.threshold ?? 0;
+
+  /// Classify a Lab* triple directly. Exposed so the ladder's geometry can be
+  /// tested without a camera — the property that broke here is arithmetic, not
+  /// optical, and a test that needs a handset would never have caught it.
+  ftr.Prediction classify(List<double> lab) => _classifier.predict(lab);
 
   Measurement? measure(Uint8List jpeg) {
     if (_busy) return null;

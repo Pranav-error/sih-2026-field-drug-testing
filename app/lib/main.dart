@@ -297,14 +297,11 @@ class _CaptureFlowState extends State<CaptureFlow> {
   SecondView get _secondView =>
       SecondView(baselineMm: _baselineMm, cardVisible: true);
 
-  static const _result = TestResult(
-    predictionSet: ['opiate_class', 'amphetamine_class'],
-    label: null,
-    lab: [21.6, 19.4, -6.1],
-    alpha: 0.05,
-    threshold: 5.53,
-    scores: {'opiate_class': 4.12, 'amphetamine_class': 5.02, 'negative': 46.8},
-  );
+  // The hardcoded `_result` that used to live here is gone. It was shown
+  // whenever the real measurement produced nothing, so a failed scan rendered
+  // as a plausible inconclusive reading — and it was arithmetically impossible
+  // besides, claiming a point 4.12 from one locus and 5.02 from another that
+  // are 30.20 apart. There is no fallback now: no measurement is a refusal.
 
   Map<String, Object?> _livenessRecord() {
     final l = _live?.liveness;
@@ -338,7 +335,13 @@ class _CaptureFlowState extends State<CaptureFlow> {
   }
 
   Future<void> _sealInner() async {
-    final shown = _live?.result ?? _result;
+    // No fallback. Sealing a canned result would put a measurement into the
+    // record that no camera produced — the one thing an evidentiary record must
+    // never do.
+    final shown = _live?.result;
+    if (shown == null) {
+      throw StateError('nothing was measured on this frame — retake it');
+    }
     // Read the position at the moment of sealing, not at app start.
     final fix = await LocationReader.read();
     // Now the standby screen can stop saying "not checked yet" about a thing
@@ -662,10 +665,18 @@ class _CaptureFlowState extends State<CaptureFlow> {
         ]);
       case Step.result:
         return ResultScreen(
-          result: _live?.result ?? _result,
+          result: _live?.result,
+          refusals: _live?.refusals ?? const ['no frame was measured'],
+          guidance: _live?.guidance,
           liveness: _live?.liveness ?? const Liveness.notChecked(),
           sealError: _sealError,
           onSeal: _seal,
+          onRetake: () => setState(() {
+            _frameA = null;
+            _frameB = null;
+            _live = null;
+            _step = Step.capture;
+          }),
         );
       case Step.sealed:
         return Scaffold(

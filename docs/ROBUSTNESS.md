@@ -312,3 +312,40 @@ developments and no public dataset of colorimetric drug-test strip images — th
 published smartphone-colorimetry work releases none of its data. The optics are now
 honest; the chemistry is still borrowed, and the submission should say so before
 anyone asks.
+
+---
+
+## The surrogate ladder must be separable
+
+Two reference loci were guesses, and both made the classifier unusable in a way
+that looked like a broken scanner.
+
+`negative` sat at L=80.1. The real printed card's empty well measures
+**L=95.5** (`dart/ftr_verify/test/fixtures/real_card.jpg`). At 80.1 a dry well
+scored **11.25** from its own class — outside the 5.53 threshold — so a blank
+card returned an *empty* prediction set and was reported as inconclusive when
+the correct answer was a clean **negative**.
+
+`opiate_related` sat **3.33** from `opiate_class` while the threshold is
+**5.53**. Any reading near either fell inside both, so a single label was
+arithmetically impossible. At the calibration's own scatter (σ = 2.4 Lab units)
+a clean read returned one label about **one time in nine**:
+
+| scatter | single label | inconclusive |
+|---|---|---|
+| σ = 1.0 | 0.0% | 100% |
+| σ = 2.0 | 6.2% | 93.7% |
+| σ = 2.4 | 11.3% | 88.2% |
+
+The classifier was not wrong. It was correctly refusing to separate two classes
+the ladder does not separate — conformal abstention doing exactly its job on a
+ladder whose rungs are closer together than its own threshold.
+
+**The rule now enforced:** every pair of loci is more than **2× the threshold**
+apart (minimum 15.87 against 5.53), so a reading near a rung falls inside exactly
+one. `app/test/measure_bridge_test.dart` fails if a future locus is added too
+close to an existing one, and `app/test/real_card_test.dart` runs the whole
+pipeline on the real card photograph and requires a single label out of it.
+
+This is geometry, not optics: a test needing a handset would never have caught
+it, and the defect survived every synthetic test in the repository.

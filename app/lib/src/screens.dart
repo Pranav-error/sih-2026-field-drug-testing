@@ -364,17 +364,78 @@ class SecondViewScreen extends StatelessWidget {
 class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key, required this.result, this.onSeal,
       this.liveness = const Liveness.notChecked(),
-    this.sealError});
+      this.refusals = const [],
+      this.guidance,
+      this.onRetake,
+      this.sealError});
 
-  final TestResult result;
+  /// Null when the frame produced no measurement at all.
+  ///
+  /// It used to fall back to a hardcoded constant, so a failed scan rendered as
+  /// a plausible inconclusive reading and there was no way to tell a working
+  /// capture from a broken one. The constant was also arithmetically impossible
+  /// — it claimed a point 4.12 from one locus and 5.02 from another that are
+  /// 30.20 apart.
+  final TestResult? result;
+
+  /// What the pipeline refused on, when there is no result.
+  final List<String> refusals;
+
+  /// What the operator should do about it.
+  final String? guidance;
+
   final VoidCallback? onSeal;
   final Liveness liveness;
 
   /// Why the last seal attempt failed, if it did. Shown rather than swallowed.
   final String? sealError;
 
+  final VoidCallback? onRetake;
+
   @override
   Widget build(BuildContext context) {
+    final r = result;
+    if (r == null) return _noMeasurement(context);
+    return _measured(context, r);
+  }
+
+  /// No result is a refusal, not a result. Nothing here may be sealed: there is
+  /// no measurement to seal, and the previous behaviour put a canned one into
+  /// the record.
+  Widget _noMeasurement(BuildContext context) => AppScaffold(
+        title: 'No measurement',
+        chip: const StateChip('Refused',
+            colour: Tokens.abstain, soft: Tokens.abstainSoft),
+        body: [
+          Panel(title: 'This frame produced no reading', children: [
+            const Text(
+              'The pipeline did not return a measurement, so there is nothing to '
+              'classify and nothing to seal. This is not an inconclusive result — '
+              'it is the absence of one.',
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: Tokens.ink2),
+            ),
+            if (guidance != null && guidance!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Measured('What to do', guidance!),
+            ],
+          ]),
+          if (refusals.isNotEmpty)
+            Panel(title: 'Refused on', children: [
+              for (final r in refusals)
+                Text('· $r',
+                    style: const TextStyle(
+                        fontSize: 12, height: 1.5, color: Tokens.abstain)),
+            ]),
+          const PresumptiveNotice(
+            detail: 'Presumptive only. This is a screening indication, not '
+                'confirmation of identity or quantity. Laboratory analysis under '
+                'NDPS procedure remains required.',
+          ),
+        ],
+        footer: [PrimaryButton('Retake the frame', onPressed: onRetake)],
+      );
+
+  Widget _measured(BuildContext context, TestResult result) {
     final outcome = result.outcome;
     final setText =
         result.predictionSet.isEmpty ? '∅' : result.predictionSet.join(', ');
