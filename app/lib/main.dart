@@ -30,6 +30,7 @@ import 'package:flutter/material.dart';
 import 'package:ftr_verify/ftr_verify.dart' as ftr;
 
 import 'src/models.dart';
+import 'src/record_id.dart';
 import 'src/screens.dart';
 import 'src/tokens.dart';
 
@@ -130,6 +131,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
   String? _sealError;
   bool _storedOk = false;
   String? _storeError;
+
+  /// The record is in the chain but its frames are not beside it. A separate
+  /// failure from the record write, and it must not read as the same one.
+  String? _frameError;
 
   /// Set the first time a real position is read. Stays null before that: "off"
   /// is a finding, and claiming it before looking is a fabricated value.
@@ -344,10 +349,17 @@ class _CaptureFlowState extends State<CaptureFlow> {
       throw StateError('no captured frame to seal — capture one first');
     }
     final body = ftr.buildBody(
-      recordUuid: '00000000-0000-4000-a000-${_sequence.toString().padLeft(12, '0')}',
+      recordUuid: newRecordUuid(),
       sequence: _store?.nextSequence ?? _sequence,
       prevRecordHash: _store?.head ?? _chainHead,
-      capturedAt: {'device_clock': DateTime.now().toIso8601String()},
+      // UTC with an explicit Z, plus the offset the handset was set to.
+      // A bare local ISO string carries no zone at all: a record made at 07:06
+      // IST reads as 07:06 in whatever zone the reader assumes. The timestamp
+      // is only a claim either way — an ambiguous claim is strictly worse.
+      capturedAt: {
+        'device_clock': DateTime.now().toUtc().toIso8601String(),
+        'device_utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+      },
       operator_: {
         if (_operatorId.isNotEmpty) 'id': _operatorId,
         // FALSE would be a lie if we claimed otherwise: the signing key is not
@@ -417,19 +429,28 @@ class _CaptureFlowState extends State<CaptureFlow> {
     } else {
       rec = ftr.seal(body, _software);
     }
-    if (!mounted) return;
-
-    // Persist before anything else. A record that is shown but not written is
-    // not a record, and the ledger's guarantees are about files on disk.
+    // Persist BEFORE the mounted check. A `return` here used to drop a record
+    // that was already signed: background the app in the window between the
+    // secure element returning a signature and the write, and the record was
+    // gone with nothing said. Whether this widget is still on screen has no
+    // bearing on whether a sealed record belongs in the ledger.
     var stored = false;
     String? storeError;
+    String? frameError;
     try {
       if (_store != null) {
         _store!.append(rec);
-        // The frames go beside the record, so the verifier's image check is
-        // something a reader can actually run.
-        _store!.writeFrames(rec.sequence, frameA: frame, frameB: _frameB);
+        // The append is what puts the record in the chain, so `stored` is true
+        // from here. The frames are a separate failure: they can fail on their
+        // own, and reporting "NO — memory only" about a record that IS in the
+        // chain is the more dangerous error — an officer would re-run a test
+        // that already sealed.
         stored = true;
+        try {
+          _store!.writeFrames(rec.sequence, frameA: frame, frameB: _frameB);
+        } catch (e) {
+          frameError = '$e';
+        }
       }
     } catch (e) {
       // The reason must reach the screen. "NO — memory only" with no cause is
@@ -438,6 +459,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       stored = false;
       storeError = '$e';
     }
+    if (!mounted) return;
 
     final schedule = await ScheduleLoader.load();
     final cert = buildCertificate(rec, schedule);
@@ -449,6 +471,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       _sealError = null;
       _storedOk = stored;
       _storeError = storeError;
+      _frameError = frameError;
       _digestHex = ftr.hex(rec.digest);
       _chainHead = rec.digest;
       if (!stored) _sequence += 1;
@@ -576,6 +599,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
       case Step.standby:
         return StandbyScreen(
           posture: _posture,
+          cardId: _cardId.isEmpty ? null : _cardId,
           keystoreNote: _keystoreNote,
           onBegin: () => setState(() {
             _progress = 0;
@@ -648,6 +672,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
           body: SealedScreen(
             stored: _storedOk,
             storeError: _storeError,
+            frameError: _frameError,
             digestHex: _digestHex,
             // The store owns sequencing once it exists; _sequence is only the
             // in-memory fallback for a platform with no filesystem.

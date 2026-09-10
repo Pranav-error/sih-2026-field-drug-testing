@@ -68,6 +68,36 @@ void main() {
       }
     });
 
+    test('the replay cache is dropped when a record is appended', () {
+      // status() ECDSA-verifies every record, so it is cached. A cache that
+      // outlived an append would hide a chain break from the log screen, which
+      // is worse than the cost it saves.
+      final c = _chain(2);
+      addTearDown(() => c.dir.deleteSync(recursive: true));
+
+      expect(c.store.status().intact, isTrue);
+      expect(c.store.records().length, 2);
+
+      final other = ftr.SoftwareKeystore(seed: 99);
+      c.store.append(ftr.seal(_body(2, c.store.head), other));
+
+      expect(c.store.records().length, 3, reason: 'stale record cache');
+      expect(c.store.status().intact, isFalse, reason: 'stale status cache');
+    });
+
+    test('a repeated status() does not re-verify from scratch', () {
+      final c = _chain(3);
+      addTearDown(() => c.dir.deleteSync(recursive: true));
+      final first = Stopwatch()..start();
+      c.store.status();
+      first.stop();
+      final second = Stopwatch()..start();
+      c.store.status();
+      second.stop();
+      expect(second.elapsedMicroseconds, lessThan(first.elapsedMicroseconds),
+          reason: 'the second call should be a cache hit');
+    });
+
     test('a record is never rewritten', () {
       final c = _chain(1);
       addTearDown(() => c.dir.deleteSync(recursive: true));

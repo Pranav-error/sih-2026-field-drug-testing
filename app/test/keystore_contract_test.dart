@@ -59,6 +59,14 @@ void main() {
     expect(src, contains('update(body)'));
   });
 
+  test('the security-level explanation survives a restart', () {
+    // note was only set inside the `if (!containsAlias)` branch, so a handset
+    // that fell back to the TEE explained itself once and was silent on every
+    // later launch. The level stayed honest; the reason did not.
+    expect(src, contains('if (note.isEmpty() && level != "STRONGBOX")'));
+    expect(src, contains('val level = reportedLevel(entry.privateKey)'));
+  });
+
   test('MainActivity passes the body under that name', () {
     final main = File('android/app/src/main/kotlin/in/gov/ncb/sih26231/'
         'field_companion/MainActivity.kt');

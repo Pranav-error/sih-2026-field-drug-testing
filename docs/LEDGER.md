@@ -57,6 +57,17 @@ is the system of record; building a queryable evidence store here would create a
 second surveillance surface with no benefit, and `ARCHITECTURE.md §12` lists it
 among the things this project deliberately does not build.
 
+### Cost of a replay
+
+`status()` ECDSA-verifies every record — measured at **~4.4 ms each** on a
+developer machine, and several times that on a handset. The log screen used to
+call it on every widget rebuild, alongside a second full parse, so a few hundred
+records blocked the main thread for seconds at a time. `RecordStore` now caches
+the replay and invalidates it in `append()`, which is the only place the truth
+changes. A stale cache here would be a chain break the log fails to show, so
+nothing else may clear it; `refresh()` exists for a caller with reason to believe
+the directory changed underneath it.
+
 ### Capacity
 
 A record is ~2 KB; the two frames are ~200 KB each. About **400 KB per test**,
@@ -87,6 +98,12 @@ Everything on the critical path runs on the handset:
 
 There is no degraded offline mode because there is no online mode. A record
 sealed at a checkpoint with no tower is byte-identical to one sealed in a lab.
+
+**Time, written unambiguously.** `captured_at.device_clock` is UTC with an
+explicit `Z`, and `device_utc_offset_minutes` records what the handset was set
+to. A bare local ISO string carries no zone at all — a record made at 07:06 IST
+reads as 07:06 to whoever assumes otherwise. The timestamp is only a claim
+either way (§3); an ambiguous claim is strictly worse than a precise one.
 
 **Location, when there is no fix.** `location.dart` never throws and never
 invents. Every failure path returns a `Fix` whose `status` names what happened

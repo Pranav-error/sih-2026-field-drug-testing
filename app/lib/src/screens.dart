@@ -21,6 +21,7 @@ class StandbyScreen extends StatelessWidget {
     super.key,
     required this.posture,
     this.onBegin,
+    this.cardId,
     this.bridgeEndpoint,
     this.bridgeReachable,
     this.onEditBridge,
@@ -38,6 +39,11 @@ class StandbyScreen extends StatelessWidget {
 
   /// Retained so the web build can still point at a bridge; the handset build
   /// measures on-device and leaves these null.
+  /// The card the operator actually entered, not a constant. A standby screen
+  /// naming a card that is not the one in the officer's hand is a small lie
+  /// that gets read as a device capability.
+  final String? cardId;
+
   final String? bridgeEndpoint;
   final bool? bridgeReachable;
   final VoidCallback? onEditBridge;
@@ -108,7 +114,8 @@ class StandbyScreen extends StatelessWidget {
         Panel(title: 'Measurement pipeline', children: [
           const Measured('Runs', 'On this device', tone: Tokens.negative),
           const Measured('Network required', 'None', tone: Tokens.negative),
-          const Measured('Reference card', 'CARD-IN-2026'),
+          Measured('Reference card', cardId ?? 'Not set',
+              tone: cardId == null ? Tokens.abstain : null),
           const SizedBox(height: 6),
           const Text(
             'Fiducial detection, the illumination fit, the colour transform and '
@@ -476,6 +483,7 @@ class SealedScreen extends StatelessWidget {
     required this.anchored,
     this.stored = false,
     this.storeError,
+    this.frameError,
   });
 
   final String digestHex;
@@ -491,6 +499,10 @@ class SealedScreen extends StatelessWidget {
   /// Why the write failed, when it did. A record that is not on disk is not in
   /// the chain, and an officer who cannot see the reason cannot fix it.
   final String? storeError;
+
+  /// The record reached the chain but its frames did not. Reported separately,
+  /// because it does not mean the record was lost.
+  final String? frameError;
 
   @override
   Widget build(BuildContext context) {
@@ -521,11 +533,37 @@ class SealedScreen extends StatelessWidget {
               style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
             ),
           ],
+          if (stored && frameError != null) ...[
+            const SizedBox(height: 4),
+            const Measured('Frames beside the record', 'NOT WRITTEN',
+                tone: Tokens.abstain),
+            Text(frameError!,
+                style: Tokens.monoStyle(size: 10, colour: Tokens.abstain)),
+            const SizedBox(height: 2),
+            const Text(
+              'The record is sealed and in the chain. Its image hashes name '
+              'files that are not on this device, so the verifier cannot re-check '
+              'them from here.',
+              style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+            ),
+          ],
         ]),
         Panel(title: 'Signature', children: [
           Measured('Key', securityLevel,
               tone: securityLevel == 'SOFTWARE' ? Tokens.abstain : Tokens.negative),
-          const Measured('Use authorised by', 'Fingerprint'),
+          // Was 'Fingerprint'. The record directly above carries
+          // biometric_unlock_used: false, because the key is created without
+          // setUserAuthenticationRequired — nothing gates its use. The screen
+          // asserting a fingerprint that never happened is the same false claim
+          // that was removed from the record itself.
+          const Measured('Use authorised by', 'Nothing', tone: Tokens.abstain),
+          const SizedBox(height: 4),
+          const Text(
+            'The key is not gated on user authentication, so no fingerprint or '
+            'PIN was required to sign. The record says so too, and both '
+            'verifiers state it.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+          ),
         ]),
         PresumptiveNotice(
           detail: anchored

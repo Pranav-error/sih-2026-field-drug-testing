@@ -82,8 +82,29 @@ object HardwareKeystore {
         val chain = entry.certificateChain.map {
             Base64.encodeToString(it.encoded, Base64.NO_WRAP)
         }
+        val level = reportedLevel(entry.privateKey)
+
+        // The note above is only set on the run that generates the key. Every
+        // later launch takes the `containsAlias` branch, so a handset that fell
+        // back to the TEE explained itself once and then went quiet about it
+        // forever. The level stayed honest; the reason for it did not survive a
+        // restart. Derive it from what actually backs the key instead.
+        if (note.isEmpty() && level != "STRONGBOX") {
+            note = when (level) {
+                "TEE" -> "This key lives in the TEE, not in a discrete secure " +
+                    "element. StrongBox is either unavailable on this handset or " +
+                    "was unavailable when the key was created."
+                "SOFTWARE" -> "This key is NOT in secure hardware. Records signed " +
+                    "with it will fail verification and must never be presented " +
+                    "as evidence."
+                else -> "Android did not report what backs this key. The " +
+                    "attestation certificate shipped with each record is " +
+                    "authoritative."
+            }
+        }
+
         return Attested(
-            securityLevel = reportedLevel(entry.privateKey),
+            securityLevel = level,
             strongBoxRequested = strongBox,
             certChain = chain,
             publicKeyDer = Base64.encodeToString(

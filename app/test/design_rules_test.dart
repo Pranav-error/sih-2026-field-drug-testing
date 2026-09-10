@@ -228,6 +228,19 @@ void main() {
       expect(find.textContaining('attestation certificate'), findsOneWidget);
     });
 
+    testWidgets('standby names the card the operator entered, not a constant',
+        (t) async {
+      await t.pumpWidget(wrap(const StandbyScreen(
+          posture: realHandsetPosture, cardId: 'CARD-IN-2026-0417')));
+      expect(find.text('CARD-IN-2026-0417'), findsOneWidget);
+    });
+
+    testWidgets('with no card entered it says so rather than inventing one',
+        (t) async {
+      await t.pumpWidget(wrap(const StandbyScreen(posture: realHandsetPosture)));
+      expect(find.text('Not set'), findsOneWidget);
+    });
+
     testWidgets('an UNKNOWN security level is not announced as a software key',
         (t) async {
       // reportedLevel() returns UNKNOWN whenever the KeyInfo lookup throws — a
@@ -314,6 +327,44 @@ void main() {
         stored: true,
       )));
       expect(find.textContaining('not in the chain'), findsNothing);
+    });
+
+    testWidgets('the screen never claims a fingerprint that never happened',
+        (t) async {
+      // The record carries biometric_unlock_used: false — the key is created
+      // without setUserAuthenticationRequired. The screen used to print
+      // "Use authorised by: Fingerprint" directly above it.
+      await t.pumpWidget(wrap(SealedScreen(
+        digestHex: 'ab' * 32,
+        sequence: 1,
+        securityLevel: 'STRONGBOX',
+        anchorWindow: '2m',
+        anchored: false,
+        stored: true,
+      )));
+      expect(find.textContaining('Fingerprint'), findsNothing);
+      expect(find.text('Nothing'), findsOneWidget);
+      expect(find.textContaining('not gated on user authentication'),
+          findsOneWidget);
+    });
+
+    testWidgets('a frame-write failure does not read as a lost record',
+        (t) async {
+      // append() succeeded; only writeFrames() threw. Saying "NO — memory only"
+      // here is wrong in the dangerous direction: an officer would re-run a
+      // test that already sealed.
+      await t.pumpWidget(wrap(SealedScreen(
+        digestHex: 'ab' * 32,
+        sequence: 1,
+        securityLevel: 'STRONGBOX',
+        anchorWindow: '2m',
+        anchored: false,
+        stored: true,
+        frameError: 'FileSystemException: No space left on device',
+      )));
+      expect(find.textContaining('NO — memory only'), findsNothing);
+      expect(find.textContaining('sealed and in the chain'), findsOneWidget);
+      expect(find.text('NOT WRITTEN'), findsOneWidget);
     });
 
     testWidgets('the digest is selectable, because it gets copied', (t) async {

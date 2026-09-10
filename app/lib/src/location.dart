@@ -47,12 +47,18 @@ class Fix {
       if (latitude != null) 'lat_x1e7': (latitude! * 1e7).round(),
       if (longitude != null) 'lon_x1e7': (longitude! * 1e7).round(),
       if (accuracyMetres != null) 'accuracy_m_x10': (accuracyMetres! * 10).round(),
-      // One channel, named. ARCHITECTURE.md §5 describes five; four of them are
-      // not collected in this build and the record must not imply otherwise.
-      'channels_collected': const ['fused_gnss'],
-      'channels_not_collected': const [
-        'raw_gnss_cn0', 'wifi_bssid_set', 'serving_cell', 'kinematics',
-      ],
+      // One channel, named — and only when it actually produced something.
+      // Listing fused_gnss as collected on a fix that failed says a channel was
+      // read when it was not, inside the signed body. ARCHITECTURE.md §5
+      // describes five; the rest are not collected in this build and the record
+      // must not imply otherwise.
+      'channels_collected': available ? const ['fused_gnss'] : const <String>[],
+      'channels_not_collected': available
+          ? const ['raw_gnss_cn0', 'wifi_bssid_set', 'serving_cell', 'kinematics']
+          : const [
+              'fused_gnss', 'raw_gnss_cn0', 'wifi_bssid_set', 'serving_cell',
+              'kinematics',
+            ],
       'corroboration_channels_agreeing': available ? 1 : 0,
       'corroboration_channels_total': 1,
       'spoof_indicators': indicators,
