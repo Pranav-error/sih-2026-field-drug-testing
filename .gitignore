@@ -13,6 +13,12 @@ __pycache__/
 /*.png
 docs/preview-*.png
 
+# Built APKs. GitHub warns above 50MB and these are ~57MB each; one is already
+# in history (dist/sih26231-v6.apk) and every push since has carried it. The
+# binary is not the artefact anyway — build-apk.sh reproduces it from the commit
+# stamped on its own standby screen, which is the thing worth keeping.
+dist/
+
 # Never commit signing keys, even development ones
 *.pem
 
@@ -21,7 +27,6 @@ dart/**/.dart_tool/
 dart/**/build/
 
 # Flutter
-app/build/
 app/.dart_tool/
 app/.flutter-plugins*
 app/**/local.properties
@@ -31,4 +36,3 @@ app/**/GeneratedPluginRegistrant.*
 # python core/tools/fetch_spectral_data.py
 data/spectral/*.txt
 
-app/build/
