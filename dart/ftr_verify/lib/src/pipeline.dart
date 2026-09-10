@@ -356,7 +356,8 @@ DeviceMeasurement measureOnDevice(img.Image src,
         3, (k) => raw[i][k] / math.max(g[k], 1e-6)));
   }
 
-  final transform = RootPolynomial.fit(corrected, _referenceXyz(spec));
+  final reference = _referenceXyz(spec);
+  final transform = RootPolynomial.fit(corrected, reference);
 
   final well = _samplePatch(src, h, spec.wellCentreMm[0], spec.wellCentreMm[1],
       spec.wellRadiusMm * 0.7);
@@ -386,6 +387,9 @@ DeviceMeasurement measureOnDevice(img.Image src,
     refusals.add('the card\'s own patches did not reproduce '
         '(${transform.residualDeltaE.toStringAsFixed(2)} dE) — no measurement '
         'from this frame is trustworthy');
+    // And why. A refusal carrying one number sends the operator back to retake
+    // the same frame in the same conditions and get the same number.
+    refusals.add('likely cause: ${transform.diagnose(reference)}');
   }
 
   Prediction? prediction;

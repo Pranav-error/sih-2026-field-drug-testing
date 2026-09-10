@@ -190,7 +190,13 @@ class RootPolynomial {
   final double residualDeltaE;
   final double maxDeltaE;
 
-  RootPolynomial(this.matrix, this.residualDeltaE, this.maxDeltaE);
+  /// CIEDE2000 per fitted patch. Kept, not discarded: the mean says the fit
+  /// failed, only the spread says why, and an operator holding a refusal with
+  /// one number has nothing to act on.
+  final List<double> perPatchDeltaE;
+
+  RootPolynomial(this.matrix, this.residualDeltaE, this.maxDeltaE,
+      [this.perPatchDeltaE = const []]);
 
   /// Solve the transform. [deviceRgb] is linear RGB in [0, 1].
   factory RootPolynomial.fit(List<List<double>> deviceRgb, List<List<double>> referenceXyz) {
@@ -204,6 +210,7 @@ class RootPolynomial {
     final m = _lstsq(a, referenceXyz);
 
     var sum = 0.0, worst = 0.0;
+    final per = <double>[];
     for (var i = 0; i < a.length; i++) {
       final pred = List<double>.filled(3, 0);
       for (var j = 0; j < 3; j++) {
@@ -213,9 +220,10 @@ class RootPolynomial {
       }
       final de = deltaE2000(xyzToLab(pred), xyzToLab(referenceXyz[i]));
       sum += de;
+      per.add(de);
       if (de > worst) worst = de;
     }
-    return RootPolynomial(m, sum / a.length, worst);
+    return RootPolynomial(m, sum / a.length, worst, per);
   }
 
   List<double> toLab(List<double> deviceRgb) {
@@ -230,6 +238,92 @@ class RootPolynomial {
   }
 
   bool passes([double limitDeltaE = 3.0]) => residualDeltaE <= limitDeltaE;
+
+  /// Name the most likely cause of a failed fit, from the shape of the error.
+  ///
+  /// Mirrors `RootPolynomial.diagnose` in the Python. A refusal carrying one
+  /// number sends the operator back to retake the same frame in the same
+  /// conditions and get the same number; the card spans dark to light and
+  /// neutral to saturated, so the pattern of error across it is diagnostic.
+  ///
+  /// A hint, and worded as one. It never enters a sealed record — a guess about
+  /// somebody's lighting is not evidence.
+  String diagnose(List<List<double>> referenceXyz) {
+    final de = List<double>.from(perPatchDeltaE);
+    if (de.length < 6 || de.length != referenceXyz.length) {
+      return 'too few patches to say why.';
+    }
+
+    final sorted = List<double>.from(de)..sort();
+    double median(List<double> v) {
+      final n = v.length;
+      return n.isOdd ? v[n ~/ 2] : (v[n ~/ 2 - 1] + v[n ~/ 2]) / 2;
+    }
+
+    final med = median(sorted);
+    final devs = de.map((d) => (d - med).abs()).toList()..sort();
+    final mad = median(devs) == 0 ? 1e-9 : median(devs);
+    final lo = sorted.first, hi = sorted.last;
+
+    // A minority of patches, each far outside the rest of the distribution.
+    // Fraction-based: a glare spot lands on however many patches it covers.
+    var nOut = 0;
+    for (final d in de) {
+      if (0.6745 * (d - med) / mad > 6) nOut++;
+    }
+    final cap = de.length ~/ 4 < 2 ? 2 : de.length ~/ 4;
+    if (nOut > 0 && nOut <= cap && hi > 2.5 * med) {
+      return '$nOut of ${de.length} patches are far worse than the rest '
+          '(worst ${hi.toStringAsFixed(1)} dE against a typical '
+          '${med.toStringAsFixed(1)}) — that is something on the card, not the '
+          'light: a glare spot, a reflection, or an object resting on it.';
+    }
+
+    final lab = referenceXyz.map(xyzToLab).toList();
+    final light = lab.map((l) => l[0]).toList();
+    final chroma =
+        lab.map((l) => math.sqrt(l[1] * l[1] + l[2] * l[2])).toList();
+
+    double corr(List<double> x) {
+      final n = x.length;
+      final mx = x.reduce((a, b) => a + b) / n;
+      final my = de.reduce((a, b) => a + b) / n;
+      var sxy = 0.0, sxx = 0.0, syy = 0.0;
+      for (var i = 0; i < n; i++) {
+        final dx = x[i] - mx, dy = de[i] - my;
+        sxy += dx * dy;
+        sxx += dx * dx;
+        syy += dy * dy;
+      }
+      if (sxx < 1e-12 || syy < 1e-12) return 0;
+      return sxy / math.sqrt(sxx * syy);
+    }
+
+    final rLight = corr(light), rChroma = corr(chroma);
+
+    if (rLight < -0.5 && rLight.abs() > rChroma.abs()) {
+      return 'the error grows as the patches get darker '
+          '(r=${rLight.toStringAsFixed(2)}) — light is being added on top of the '
+          'card. A reflection on a glossy surface, or the black level of a screen '
+          'if the card is displayed rather than printed.';
+    }
+    if (rChroma > 0.5 && rChroma.abs() > rLight.abs()) {
+      return 'the error grows with how saturated the patch is '
+          '(r=${rChroma.toStringAsFixed(2)}) — the colours are being stretched. '
+          'A wide-gamut or "vivid" display, or colour management left on when '
+          'the card was printed.';
+    }
+    if (hi - lo < (med > 3.0 ? med : 3.0)) {
+      return 'every patch is wrong by about the same amount '
+          '(${lo.toStringAsFixed(1)}-${hi.toStringAsFixed(1)} dE) — that is the '
+          "light's spectrum, not its evenness. A low-CRI bulb, or two different "
+          'lights on one card. Daylight or a high-CRI lamp is the fix.';
+    }
+    return 'the error is spread unevenly across the card '
+        '(${lo.toStringAsFixed(1)}-${hi.toStringAsFixed(1)} dE) with no clear '
+        'pattern by lightness or saturation. Check for a reflection, and retake '
+        'in daylight before looking further.';
+  }
 }
 
 // --------------------------------------------------------------------------- //

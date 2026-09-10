@@ -3,11 +3,18 @@
 Asked before a demo, and worth answering with measurements rather than an
 opinion, because the two halves of the pipeline give opposite answers.
 
-**Colour: yes, on a decent display.** The device transform is fitted per frame
+**Colour: often, but not reliably.** The device transform is fitted per frame
 from the patches on the card itself, and a screen distorts the patches and the
-well together — so the fit absorbs the screen. Only a coarse display fails, and
-it fails at the quality gate on patch uniformity rather than by measuring the
-wrong colour.
+well together — so the fit absorbs a lot. In simulation it absorbs subpixel
+structure, a wide-gamut P3 panel handed sRGB numbers, and a saturation boost.
+
+⚠ That is weaker than this file originally claimed. A tester photographing the
+card off a laptop panel got a residual of **11.01 dE**, and none of the
+distortions simulated here reproduces it — so a real display does something
+these tests do not model, and "a typical phone display works" was an overclaim
+from a simulation that only had subpixel stripes in it. What the pipeline does
+reliably is *refuse*: it has never been observed to measure the wrong colour
+from a screen, only to decline. Print the card if the reading matters.
 
 **Liveness: no, and never.** A screen is flat. It returns 0.0 px of parallax
 against a predicted 28.2 px, and no display improvement changes that: flatness

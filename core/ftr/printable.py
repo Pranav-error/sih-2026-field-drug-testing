@@ -299,6 +299,26 @@ WHAT THESE ARE
   record that does not say it came from a demonstration card is the one thing
   here that could actually mislead somebody.
 
+NO PRINTER? A SCREEN SOMETIMES WORKS — DO NOT COUNT ON IT
+  Photographing the card off a screen often gives a correct colour result. The
+  device transform is fitted per frame from the patches on the card itself, so
+  the fit absorbs a good deal of what a display does to the colours.
+
+  But it is not dependable. A tester shooting a laptop panel got a refusal at
+  11.01 dE, and no simulated display defect we tried reproduces that — a real
+  panel evidently does something our tests do not model. The good news is the
+  failure mode: it REFUSES rather than reporting the wrong drug class.
+
+  On a refusal the app now prints "likely cause: ..." beneath it. Read that
+  line. It distinguishes a reflection on the glass from the room lighting from
+  a display colour problem, so you change the right thing.
+
+  And a screen can never pass the liveness check: it is flat, so it gives 0.0px
+  of parallax against a predicted 28.2px. That is the anti-replay defence doing
+  its job, not a fault. From a screen, take one frame and tap "Continue with one
+  frame only" — the record then states plainly that no liveness check was
+  performed, which is a demo you can defend.
+
 PRINTING
   Scale                 100%. Not "fit to page" — the geometry is metric and
                         the parallax check is in millimetres.

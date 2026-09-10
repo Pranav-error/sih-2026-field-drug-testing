@@ -14,27 +14,25 @@ WHAT THESE ARE
   record that does not say it came from a demonstration card is the one thing
   here that could actually mislead somebody.
 
-NO PRINTER? YOU CAN DEMO FROM A SCREEN — WITH ONE LIMIT
-  Displaying a card on a second phone and photographing it WORKS for the colour
-  result. The device transform is fitted per frame from the patches on the card
-  itself, and a screen distorts the patches and the well together, so the fit
-  absorbs the screen. Measured: a typical phone display classifies correctly.
+NO PRINTER? A SCREEN SOMETIMES WORKS — DO NOT COUNT ON IT
+  Photographing the card off a screen often gives a correct colour result. The
+  device transform is fitted per frame from the patches on the card itself, so
+  the fit absorbs a good deal of what a display does to the colours.
 
-  A coarse or low-resolution display is REFUSED at the quality gate — "patch
-  colour is not uniform" — because subpixel stripes break patch uniformity. It
-  is refused, never mismeasured, which is the behaviour you want.
+  But it is not dependable. A tester shooting a laptop panel got a refusal at
+  11.01 dE, and no simulated display defect we tried reproduces that — a real
+  panel evidently does something our tests do not model. The good news is the
+  failure mode: it REFUSES rather than reporting the wrong drug class.
 
-  What CANNOT work from a screen is the liveness check. A screen is flat: it
-  gives 0.0 px of parallax against a predicted 28.2 px, and no display quality
-  changes that, because flatness is the medium and not an artefact. It is the
-  anti-replay defence doing its job.
+  On a refusal the app now prints "likely cause: ..." beneath it. Read that
+  line. It distinguishes a reflection on the glass from the room lighting from
+  a display colour problem, so you change the right thing.
 
-  So, from a screen: take the first frame, then tap
-  "Continue with one frame only". You get a real classification, and the record
-  states that no liveness check was performed. That is a demo you can defend.
-
-  To show liveness working, you need a printed card with the tab folded. There
-  is no way around that, by design.
+  And a screen can never pass the liveness check: it is flat, so it gives 0.0px
+  of parallax against a predicted 28.2px. That is the anti-replay defence doing
+  its job, not a fault. From a screen, take one frame and tap "Continue with one
+  frame only" — the record then states plainly that no liveness check was
+  performed, which is a demo you can defend.
 
 PRINTING
   Scale                 100%. Not "fit to page" — the geometry is metric and

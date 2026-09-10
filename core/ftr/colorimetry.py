@@ -164,6 +164,7 @@ class RootPolynomial:
     matrix: np.ndarray            # (6, 3)
     residual_delta_e: float       # mean CIEDE2000 on the patches used to fit
     max_delta_e: float
+    per_patch_delta_e: np.ndarray = None  # type: ignore[assignment]
 
     @classmethod
     def fit(cls, device_rgb: np.ndarray, reference_xyz: np.ndarray) -> "RootPolynomial":
@@ -179,7 +180,11 @@ class RootPolynomial:
         M, *_ = np.linalg.lstsq(A, reference_xyz, rcond=None)
         de = delta_e_2000(xyz_to_lab(A @ M), xyz_to_lab(reference_xyz))
         de = np.atleast_1d(de)
-        return cls(matrix=M, residual_delta_e=float(de.mean()), max_delta_e=float(de.max()))
+        # Kept, not discarded. The mean says the fit failed; only the per-patch
+        # spread says WHY, and an operator holding a refusal with one number has
+        # nothing to act on.
+        return cls(matrix=M, residual_delta_e=float(de.mean()),
+                   max_delta_e=float(de.max()), per_patch_delta_e=de.copy())
 
     def to_lab(self, device_rgb: np.ndarray) -> np.ndarray:
         rgb = np.atleast_2d(np.asarray(device_rgb, dtype=float))
@@ -189,10 +194,82 @@ class RootPolynomial:
         """Calibration gate. A failed gate is recorded, not silently swallowed."""
         return self.residual_delta_e <= limit_delta_e
 
+    def diagnose(self, reference_xyz: np.ndarray) -> str:
+        """Name the most likely cause of a failed fit, from the shape of the error.
 
-# --------------------------------------------------------------------------- #
-# L2 — conformal abstention
-# --------------------------------------------------------------------------- #
+        A refusal carrying one number tells the operator that something is wrong
+        and nothing about what to change; they retake the same frame in the same
+        conditions and get the same number back. The card deliberately spans dark
+        to light and neutral to saturated, so the *pattern* of error across it is
+        diagnostic:
+
+          one or two patches far worse    -> a local artefact, not the lighting
+          error rises as patches darken   -> light added on top of the card
+          error rises with saturation     -> gamut stretch or a vivid picture mode
+          error flat across the card      -> the illuminant's spectrum
+
+        Decided by correlation rather than group means, because the groups
+        overlap: the card's dark patches are also its least saturated, so a mean
+        comparison attributes a chroma effect to lightness and vice versa.
+
+        Returns a hint, and is worded as one. It is not a verdict, and it never
+        appears in a sealed record — a guess about someone's lighting is not
+        evidence.
+        """
+        de = np.atleast_1d(np.asarray(self.per_patch_delta_e, dtype=float))
+        if de.size < 6:
+            return "too few patches to say why."
+
+        lab = xyz_to_lab(np.asarray(reference_xyz, dtype=float))
+        lightness, chroma = lab[:, 0], np.hypot(lab[:, 1], lab[:, 2])
+
+        # Outliers first, robustly. A median-absolute-deviation score survives
+        # the very outliers it is looking for, which a mean and standard
+        # deviation do not.
+        med = float(np.median(de))
+        mad = float(np.median(np.abs(de - med))) or 1e-9
+        z = 0.6745 * (de - med) / mad
+        # A minority of patches, each far outside the rest of the distribution.
+        # Fraction-based rather than a fixed count: a glare spot lands on however
+        # many patches it covers, and capping at two missed a three-patch
+        # reflection that scored z=10 against a median of 7.
+        n_out = int((z > 6).sum())
+        if 0 < n_out <= max(2, de.size // 4) and float(de.max()) > 2.5 * med:
+            return (f"{n_out} of {de.size} patches are far worse than the rest "
+                    f"(worst {de.max():.1f} dE against a typical {med:.1f}) — "
+                    "that is something on the card, not the light: a glare spot, "
+                    "a reflection, or an object resting on it.")
+
+        def r(x):
+            if np.std(x) < 1e-9 or np.std(de) < 1e-9:
+                return 0.0
+            return float(np.corrcoef(x, de)[0, 1])
+
+        r_light, r_chroma = r(lightness), r(chroma)
+
+        # Darker patches worse -> negative correlation with lightness.
+        if r_light < -0.5 and abs(r_light) > abs(r_chroma):
+            return ("the error grows as the patches get darker "
+                    f"(r={r_light:+.2f}) — light is being added on top of the "
+                    "card. A reflection on a glossy surface, or the black level "
+                    "of a screen if the card is displayed rather than printed.")
+        if r_chroma > 0.5 and abs(r_chroma) > abs(r_light):
+            return ("the error grows with how saturated the patch is "
+                    f"(r={r_chroma:+.2f}) — the colours are being stretched. A "
+                    "wide-gamut or 'vivid' display, or colour management left on "
+                    "when the card was printed.")
+        if float(de.max() - de.min()) < max(3.0, med):
+            return (f"every patch is wrong by about the same amount "
+                    f"({de.min():.1f}-{de.max():.1f} dE) — that is the light's "
+                    "spectrum, not its evenness. A low-CRI bulb, or two "
+                    "different lights on one card. Daylight or a high-CRI lamp "
+                    "is the fix.")
+        return (f"the error is spread unevenly across the card "
+                f"({de.min():.1f}-{de.max():.1f} dE) with no clear pattern by "
+                "lightness or saturation. Check for a reflection, and retake in "
+                "daylight before looking further.")
+
+
 
 @dataclass(frozen=True)
 class Prediction:

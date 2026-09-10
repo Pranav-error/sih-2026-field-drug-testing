@@ -151,7 +151,8 @@ def measure(image_bgr: np.ndarray, classifier: ConformalClassifier | None = None
     patches = sample_patches(rect, spec, gain=gain)
     quality = grade_frame(rect, det, patches, illum_residual, spec, gain=gain)
 
-    transform = RootPolynomial.fit(patches.rgb, reference_xyz(spec))
+    reference = reference_xyz(spec)
+    transform = RootPolynomial.fit(patches.rgb, reference)
     well_rgb, _ = sample_well(rect, spec, gain=gain)
     lab = np.atleast_1d(transform.to_lab(well_rgb[None, :]))
 
@@ -161,6 +162,9 @@ def measure(image_bgr: np.ndarray, classifier: ConformalClassifier | None = None
             f"colour transform residual {transform.residual_delta_e:.2f} dE exceeds 3.00 — "
             "the card's own patches did not reproduce, so no measurement from it is trustworthy"
         )
+        # And why. A refusal carrying one number sends the operator back to
+        # retake the same frame in the same conditions and get the same number.
+        refusals.append("likely cause: " + transform.diagnose(reference))
 
     prediction = None
     if not refusals and classifier is not None:
