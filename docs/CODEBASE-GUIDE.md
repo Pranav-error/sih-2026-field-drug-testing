@@ -533,6 +533,11 @@ app/android/.../kotlin/
 | Trained ML model | — | **Deliberately none** | ablation: the closed-form scorer won |
 | Real reagent calibration | ✔ | **NO** — surrogate loci, but now separable and anchored to the real card's measured substrate | `measure_bridge.dart::referenceLoci` |
 | **Result screen without a measurement** | — | **Fixed** — was a hardcoded constant shown on every failed scan | `ResultScreen`, `main.dart` |
+| **Sealing a refused frame** | ✔ | **YES** — `classification: {measured: false}` | `main.dart::_sealInner`, `ResultScreen` |
+| **Why a frame was refused** | — | **YES** — named from the per-patch error pattern | `RootPolynomial.diagnose`, both languages |
+| **Build identity in the binary** | — | **YES** — commit stamped, shown on standby | `build_info.dart`, `build-apk.sh` |
+| **Upgrade without wiping the ledger** | — | **YES** — stale key regenerated, unreadable records reported | `HardwareKeystore.sign`, `RecordStore`, `install.sh` |
+| **Run on real hardware** | ✔ | **YES** — OnePlus CPH2585, Android 16, TEE (no StrongBox on that device) | — |
 
 ---
 

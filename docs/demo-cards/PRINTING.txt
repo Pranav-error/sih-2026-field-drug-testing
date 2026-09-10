@@ -77,6 +77,38 @@ PRINTING
                         hue by a different amount, which is exactly what the
                         transform cannot absorb.
 
+WHAT TO TELL A PRINT SHOP
+  Copy the block between the lines and send it with the files. The two things a
+  shop gets wrong unprompted are fit-to-page, which silently shrinks the card by
+  a few percent and breaks the millimetre geometry, and auto colour enhancement,
+  which defeats the entire point — the card IS the colour reference.
+
+  ------------------------------------------------------------------
+  Please print these files:
+
+    - Actual size / 100% scale. Do NOT use "fit to page", "scale to
+      fit" or borderless. The size must be exact.
+    - One file per A4 sheet, portrait.
+    - Matte paper, around 200 gsm (matte photo paper or card stock).
+      Not glossy.
+    - Bright white paper, not cream or recycled.
+    - Colour correction OFF / "no colour adjustment" / printer
+      profile None. Please do not auto-enhance the colours.
+    - Do not cut or trim anything. Leave the full A4 sheet as
+      printed.
+  ------------------------------------------------------------------
+
+  If asked what it is: a colour calibration test chart. That is accurate.
+
+  DO NOT CUT, and here is why:
+    - the white margin around the card is a quiet zone the corner markers need
+      in order to be detected;
+    - the strip below the card is the liveness tab and must stay attached;
+    - the small corner crosses are trim marks for reference, not an instruction.
+
+  For a demo, two sheets is enough: card-amphetamine-class.png for a clear
+  positive and card-blank.png for a negative.
+
 THE LIVENESS TAB — READ THIS
   Fold the tab up along the first dashed line and over along the second, so it
   stands about 8 mm above the card face.

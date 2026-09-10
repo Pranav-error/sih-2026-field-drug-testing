@@ -180,6 +180,30 @@ later — which is the same trust model, not a workaround for missing one.
 
 ---
 
+## 4b. Upgrading without losing the ledger
+
+Every build up to `1b51409` shipped with "uninstall first", which destroyed the
+records — so no chain survived two builds, and the append-only ledger was the
+one property testing could never exercise. Two things forced it, both now fixed:
+
+**A stale signing key.** A key left by an older build threw
+`InvalidKeyException` and only an uninstall cleared it. `HardwareKeystore.sign`
+now catches that, deletes the alias, regenerates and retries once. Safe here
+specifically because this key *signs future records* rather than decrypting past
+ones: sealed records carry their own public key and attestation chain and keep
+verifying. What is lost is the claim that one device signed the whole chain — so
+the app says the key was replaced, and the chain check reports a `foreign_key`
+break rather than letting it pass quietly.
+
+**One unparseable record.** It threw from every screen that listed records, so a
+schema change bricked the log and the cure was again uninstalling — destroying
+the records the ledger exists to keep. `RecordStore` now collects those in
+`unreadable`, keeps loading the rest, takes `head` from the last *readable*
+record, and reports each as a break saying explicitly that the file has **not**
+been deleted and a build that understands it still can.
+
+`./install.sh` does the rest: `adb install -r -d`, records kept.
+
 ## 5. Two devices
 
 Each handset has its own StrongBox key, so each has its own chain. The chains

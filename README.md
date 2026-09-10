@@ -220,6 +220,22 @@ python3 -m venv .venv && .venv/bin/pip install -e core[dev]
 ./check.sh                                           # everything, both languages
 ```
 
+### Testing on a real handset
+
+```sh
+./install.sh          # build, stamp the commit, install over the top
+./install.sh --run    # the same, then stream the app's logs
+./install.sh --wipe   # destructive, only for a deliberate clean slate
+```
+
+**Every defect that mattered was found on hardware, not in simulation** — a
+stray ×255 in the sharpness normalisation, a keystore digest mismatch, an
+undeclared asset that made every seal fail, and a colour failure whose cause no
+simulation reproduced. When a handset report and a simulation disagree, get the
+real frame before theorising: install a debug build and read
+`app_flutter/ftr-chain` over `adb exec-out run-as`. That settled a three-way
+argument in minutes.
+
 ### Demonstration cards
 
 ```sh
@@ -232,7 +248,13 @@ show a positive. Each one carries a red banner saying so and `DEMO` in its card
 id, which reaches the record because the operator types it in. A card that could
 pass for an ordinary one is a route to a fabricated positive in a real record.
 
-Two things the cards taught us, both fixed and both tested:
+**Print them, do not photograph a screen.** `PRINTING.txt` carries a block you
+can send a print shop verbatim. The short version: A4, 100% scale (never
+fit-to-page), matte 180–250 gsm, bright white, colour management off, and **do
+not cut** — the white margin is a quiet zone the markers need and the strip
+below the card is the liveness tab.
+
+Three things the cards taught us, all fixed and all tested:
 
 - The banner started **on the card body**, where it covered 30 of the 196
   substrate probe points and 3 colour patches. The illumination surface and the
@@ -244,6 +266,13 @@ Two things the cards taught us, both fixed and both tested:
 - **Fold the liveness tab.** An unfolded card is flat, and the two-view check
   will correctly report `NOT LIVE — scene was flat`. That is the defence
   working, not a bug.
+- **A screen cannot stand in for paper.** Measured on real frames: residual
+  7.2–8.2 dE against a 3.0 gate, because roughly 16% of screen white lands on
+  the card as veiling glare. Neutrals reproduce, colours do not, and among the
+  colours darker is worse — grey light added on top, which a transform with no
+  constant term is structurally unable to remove. Liveness from a screen is
+  0.0 px against ~28 px predicted, at any display quality. See
+  [`ROBUSTNESS.md`](docs/ROBUSTNESS.md).
 
 ### Run it against a real printed card
 

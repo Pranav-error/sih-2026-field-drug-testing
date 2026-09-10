@@ -75,6 +75,18 @@ met a real photograph or a real screen.
 | **Handoff, and what anchoring actually buys** | `exportChain` writes a self-contained bundle to the share sheet — no network client. Exporting is what witnesses the chain: once a bundle is off the handset, rewriting those records is contradicted by a copy the app cannot reach. Weaker than a countersigned timestamp, and labelled as weaker everywhere it appears. |
 | **Two devices in one directory** | Records from a second handset, each individually valid and correctly chained, imply an ordering no single device witnessed. Both implementations now check the signing key **across** the chain and report a `foreign_key` break. |
 
+| **Demonstration cards** | One card per class plus a blank, well printed with the class colour — a rehearsal can show a positive with no reagent and no controlled substance. Each is marked twice, banner and card id, because a demo card that could pass for an ordinary one is a route to a fabricated positive in a real record. |
+| ⚠ **The banner made every demo card unmeasurable** | Printed across the card body, it covered 30 of the 196 substrate probes and 3 colour patches: the illumination surface and the device transform were both solved against a red rectangle, every filled card measured about Lab (337, −153, −6), and the gate refused them all. Nothing in the pipeline was wrong — the card was. |
+| ⚠ **And then the banner offset was fractional** | At 14 mm of non-integer pixels every element rounded differently than on a plain card, so the two differed by antialiasing everywhere — which makes "the marking does not touch the measured surface" unprovable and hides a real overlap in one-pixel noise. |
+| **Two loci were guesses that made a single label impossible** | `negative` sat at L 80.1 while the real card's substrate measures 95.5, so a dry well scored 11.25 from its own class and a blank card returned an *empty* set. `opiate_related` sat 3.33 from `opiate_class` against a 5.53 threshold, so a clean read returned one label about one time in nine. Conformal abstention was working perfectly on a ladder whose rungs are closer together than its own threshold. |
+| ⚠ **The result screen had never shown a real measurement** | It fell back to a hardcoded constant whenever the pipeline returned nothing, so a failed scan rendered as a plausible inconclusive reading. The constant was also arithmetically impossible: 4.12 dE from one locus and 5.02 from another that are 30.20 apart. |
+| ⚠ **Removing that fallback broke sealing a refusal** | The gate offered "Seal the refusal" and the screen it led to had only Retake. *A frame the instrument would not read is evidence too, and deleting it is the attack the ledger exists to stop.* |
+| **Builds became identifiable** | Several APKs went out all called "v10" from different commits; a tester reported a screen missing that had been there for weeks. The commit is now stamped into the binary and shown on standby, and an unstamped build says so rather than showing a plausible default. |
+| **Installing stopped destroying the ledger** | Every build had shipped with "uninstall first". A stale signing key is now regenerated on use — and the app says the chain spans two keys — and a record this build cannot parse is reported rather than thrown. `install.sh` keeps the records. |
+| ⚠ **The §63 Schedule was never bundled** | `assets/bsa63_schedule.json` sat in the repo undeclared in `pubspec.yaml`. The sync test passed because it reads the filesystem; `rootBundle` threw only on hardware. Sealing loads it, so **every seal failed — after the record was already appended**. One tester produced 13 records tapping a button that looked dead. A certificate failure is no longer fatal: the record is the evidence and is already on disk. |
+| **The real frame, over adb** | Three theories about a 9 dE refusal — low-CRI light, wide-gamut P3, print colour management — were all wrong and none reproduced in simulation. Pulling the actual frame off the handset settled it in minutes: neutrals fine at 2.6 dE, colours bad at 9.4, and among the colours darker is worse (r = −0.63). Grey light added on top, about 16% of screen white. A transform with no constant term cannot remove it. |
+| ⚠ **The diagnostic missed its own case, twice** | It correlated over *all* patches, so the fine neutrals diluted the signal to −0.47, just under threshold; and it compared *means*, letting one very dark near-neutral patch at 19.7 dE veto the diagnosis of the effect that produced it. Medians and a neutral-vs-chromatic split first. |
+
 ---
 
 ## Where it stands
@@ -84,7 +96,7 @@ met a real photograph or a real screen.
 | **A** — colour pipeline | Done; 83-condition sweep, 0 false accepts |
 | **B** — classification | Done and ablated; no learned component earned its place |
 | **C** — provenance | Done twice, cross-checked in both directions |
-| **D** — app | Standalone APK: on-device pipeline, liveness, StrongBox, persistent ledger, handoff bundle. No `INTERNET` permission. **Tested on a handset; seal path fixed there.** |
+| **D** — app | Standalone APK: on-device pipeline, liveness, StrongBox with TEE fallback, persistent ledger, handoff bundle, ten screens. No `INTERNET` permission. **Run on a real OnePlus over adb; five defects found there that every synthetic test had passed.** |
 | **E** — statutory | Emitter built, Schedule transcribed. Needs one Gazette comparison. |
 | **F** — data | **Not started. The critical path.** See [`DATA-NEEDED.md`](DATA-NEEDED.md). |
 

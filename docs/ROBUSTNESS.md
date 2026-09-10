@@ -349,3 +349,72 @@ pipeline on the real card photograph and requires a single label out of it.
 
 This is geometry, not optics: a test needing a handset would never have caught
 it, and the defect survived every synthetic test in the repository.
+
+---
+
+## A card on a screen: measured, not assumed
+
+Asked before a demo, when nobody had a printed card. The answer needed real
+frames, because three separate theories were offered and all three were wrong.
+
+**What was guessed, and what the simulation said:**
+
+| theory | simulated result |
+|---|---|
+| low-CRI room lighting | passes — a clean illuminant change is absorbed |
+| wide-gamut P3, unmanaged | passes — a matrix is exactly what the fit removes |
+| per-hue saturation +60% | passes |
+| print colour management (S-curve) | reaches 4.6 dE, and with a second refusal |
+
+None reproduced the reported failure, so the frames were pulled off the handset
+over adb.
+
+**What the real frames say** (OnePlus CPH2585 photographing the card in Preview
+on a glossy MacBook, three captures, residual 7.2–8.2 dE against a 3.0 gate):
+
+| group | median ΔE |
+|---|---|
+| neutral patches (chroma ≈ 0) | **2.6** |
+| coloured patches (chroma > 10) | **9.4** |
+| among the coloured, r(lightness) | **−0.63** |
+
+The greys reproduce and the hues do not, and among the hues the dark ones are
+worst. That is **grey light added on top of the card** — veiling glare on the
+glass plus the screen's own black level. Subtracting a black-level offset from
+the real frame walks the residual from 7.52 down to 3.09 at 40/255 removed, so
+the stray light is roughly **16% of screen white**.
+
+It is unfittable by construction. Adding grey to a dark *neutral* only brightens
+it, and the per-channel gain absorbs that; adding grey to a dark *saturated*
+patch desaturates it, and the root-polynomial has **no constant term** — which
+is precisely what makes it exposure-invariant. Exposure invariance and
+additive-flare rejection are the same knob, and this system chose exposure
+invariance on purpose.
+
+**Liveness is worse and simpler.** A screen is flat: 0.0 px of parallax against
+~28 px predicted. No display improves that, because flatness is the medium.
+
+**The threshold was not touched.** A 3.0 dE gate on the card's own patches is
+what makes the app refuse rather than report a wrong drug class, and loosening
+it to make a demo pass would discard the project's whole argument. Print the
+card.
+
+### The diagnostic missed its own case, twice
+
+Worth recording because both errors are easy to repeat.
+
+It correlated ΔE against lightness across **all** patches. Globally that gave
+r = −0.47, under the −0.5 threshold, because the neutrals — being fine — diluted
+it. The signal lives *within* the chromatic patches, so the neutral/chromatic
+split has to come first.
+
+And it compared group **means**. The card carries one very dark, nearly-neutral
+patch (L\* 6.8, chroma 5.7) that a grey lift hits hardest of all: it scored
+19.7 dE and pulled the neutral mean to 4.65 while the median stayed at 2.6. A
+mean let the single worst patch veto the diagnosis of the effect that produced
+it. Medians now, consistent with the MAD already used for outlier detection.
+
+`dart/ftr_verify/test/fixtures/screen_glare.jpg` is one of those frames, kept
+with four tests: the frame is geometrically good, it is refused rather than
+mismeasured, the diagnosis names grey light, and it does not fall through to
+"no clear pattern".
