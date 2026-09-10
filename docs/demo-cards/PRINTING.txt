@@ -14,6 +14,28 @@ WHAT THESE ARE
   record that does not say it came from a demonstration card is the one thing
   here that could actually mislead somebody.
 
+NO PRINTER? YOU CAN DEMO FROM A SCREEN — WITH ONE LIMIT
+  Displaying a card on a second phone and photographing it WORKS for the colour
+  result. The device transform is fitted per frame from the patches on the card
+  itself, and a screen distorts the patches and the well together, so the fit
+  absorbs the screen. Measured: a typical phone display classifies correctly.
+
+  A coarse or low-resolution display is REFUSED at the quality gate — "patch
+  colour is not uniform" — because subpixel stripes break patch uniformity. It
+  is refused, never mismeasured, which is the behaviour you want.
+
+  What CANNOT work from a screen is the liveness check. A screen is flat: it
+  gives 0.0 px of parallax against a predicted 28.2 px, and no display quality
+  changes that, because flatness is the medium and not an artefact. It is the
+  anti-replay defence doing its job.
+
+  So, from a screen: take the first frame, then tap
+  "Continue with one frame only". You get a real classification, and the record
+  states that no liveness check was performed. That is a demo you can defend.
+
+  To show liveness working, you need a printed card with the tab folded. There
+  is no way around that, by design.
+
 PRINTING
   Scale                 100%. Not "fit to page" — the geometry is metric and
                         the parallax check is in millimetres.
