@@ -24,12 +24,27 @@ class Measured extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
-          Expanded(
+          // The label yields first: it is the part a reader can infer from
+          // context, and the value is the measurement. A long value used to
+          // overflow the row instead — three separate times, each caught by the
+          // responsive test and each "fixed" by shortening that one string,
+          // which left the next caller to rediscover it.
+          Flexible(
+            flex: 3,
             child: Text(label,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 13, color: Tokens.muted)),
           ),
-          Text(value,
-              style: Tokens.monoStyle(colour: tone ?? Tokens.ink)),
+          const SizedBox(width: 8),
+          Flexible(
+            flex: 4,
+            child: Text(value,
+                textAlign: TextAlign.right,
+                // Wraps rather than truncates: a half-shown digest or build id
+                // is worse than a tall row, because it still looks like a value.
+                softWrap: true,
+                style: Tokens.monoStyle(colour: tone ?? Tokens.ink)),
+          ),
           if (limit != null)
             Text('  / $limit', style: Tokens.monoStyle(colour: Tokens.muted)),
         ],

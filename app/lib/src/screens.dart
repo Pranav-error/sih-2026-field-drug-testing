@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'build_info.dart';
 import 'tokens.dart';
 import 'viewfinder.dart';
 import 'widgets.dart';
@@ -121,6 +122,17 @@ class StandbyScreen extends StatelessWidget {
             'Fiducial detection, the illumination fit, the colour transform and '
             'the abstention threshold all run here, in Dart. Corner detection is '
             'coarser than the reference implementation, and every record says so.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+          ),
+        ]),
+        Panel(title: 'Build', children: [
+          Measured('Version', BuildInfo.label,
+              tone: BuildInfo.stamped ? null : Tokens.abstain),
+          const SizedBox(height: 5),
+          const Text(
+            'Read this out when reporting anything about this app. Two handsets '
+            'running different builds will disagree about what the app does, and '
+            'that is not a bug in either of them.',
             style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
           ),
         ]),

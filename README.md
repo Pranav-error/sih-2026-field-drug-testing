@@ -250,8 +250,16 @@ Two things the cards taught us, both fixed and both tested:
 ```sh
 .venv/bin/python -m ftr.printable --out card.png     # print at 100%, matte, no colour management
 
-cd app && flutter build apk --release                # the whole pipeline runs on the handset
+./build-apk.sh                                       # the whole pipeline runs on the handset
 ```
+
+**Always build with `build-apk.sh`, never `flutter build apk` directly.** It
+stamps the commit into the binary and names the file after it. Without that a
+build has no identity: several APKs went out all called "v10", built from
+different commits, and when a tester reported a missing screen there was no way
+to tell whether the app was wrong or the APK was old. It was the APK — the
+screen had been there for weeks. The commit now appears on the standby screen
+under **Build**, and that is the first thing to ask for in any bug report.
 
 There is no server to start. The measurement bridge that used to sit on
 `localhost:8824` was deleted once L1 moved to pure Dart: it was dead code, and it
