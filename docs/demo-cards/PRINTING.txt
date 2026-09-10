@@ -35,15 +35,47 @@ NO PRINTER? A SCREEN SOMETIMES WORKS — DO NOT COUNT ON IT
   performed, which is a demo you can defend.
 
 PRINTING
-  Scale                 100%. Not "fit to page" — the geometry is metric and
-                        the parallax check is in millimetres.
-  Stock                 matte. Gloss puts a specular highlight on the patches
-                        and the illumination gate will refuse the frame.
-  Colour management     OFF. The card IS the colour reference; letting a
-                        printer driver "improve" it defeats the purpose.
-  Ink                   any consumer inkjet or laser is fine. The device
-                        transform is fitted per frame from the printed patches,
-                        so a printer's own bias is corrected, not assumed away.
+  Paper size            A4 is fine. Each card is 110 x 134 mm, so it sits on
+                        A4 with room to spare. One card per sheet.
+
+  Scale                 100%. Not "fit to page", not "borderless" — both rescale
+                        silently. The geometry is metric and the parallax check
+                        is in millimetres, so a card printed at 97% is a card
+                        whose liveness prediction is wrong.
+
+  Finish                MATTE. Never glossy, never satin, never "photo paper"
+                        unless the box says matte. Gloss reflects the room back
+                        at the lens as a specular highlight, which is the exact
+                        failure that made screen capture unusable: light added
+                        on top of the card, which the colour transform cannot
+                        remove because it has no constant term.
+
+  Weight                180-250 gsm matte photo paper or card stock. This is
+                        not fussiness — plain 80 gsm copier paper curls, will
+                        not lie flat under the phone, and the liveness tab will
+                        not hold an 8 mm fold. It flops, the parallax reads
+                        short, and the check fails for a reason that has nothing
+                        to do with the system. If 80 gsm is all you have, print
+                        it and glue it to a cereal box.
+
+  Whiteness             bright white. NOT cream, ivory, off-white or recycled.
+                        The negative locus is L* 95.5, measured from the card's
+                        own substrate; cream paper sits several dE away and a
+                        blank card then reads as something other than negative.
+
+  Printer               any consumer inkjet or laser. The device transform is
+                        fitted per frame from the printed patches, so a
+                        printer's own colour bias is corrected rather than
+                        assumed away. Inkjet on matte stock is the most diffuse
+                        and therefore the best; laser toner has a slight sheen
+                        but works.
+
+  Colour management     OFF. "No colour correction" / "Application manages
+                        colour" / printer profile None. The card IS the colour
+                        reference; letting a driver "improve" it defeats the
+                        purpose, and a perceptual rendering intent bends each
+                        hue by a different amount, which is exactly what the
+                        transform cannot absorb.
 
 THE LIVENESS TAB — READ THIS
   Fold the tab up along the first dashed line and over along the second, so it
