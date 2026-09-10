@@ -136,6 +136,10 @@ class _CaptureFlowState extends State<CaptureFlow> {
   /// failure from the record write, and it must not read as the same one.
   String? _frameError;
 
+  /// The record sealed but its §63 certificate could not be built. Reported on
+  /// the sealed screen, never fatal — the record is the evidence.
+  String? _certError;
+
   /// Set the first time a real position is read. Stays null before that: "off"
   /// is a finding, and claiming it before looking is a fabricated value.
   bool? _mockLocationSeen;
@@ -474,12 +478,23 @@ class _CaptureFlowState extends State<CaptureFlow> {
     }
     if (!mounted) return;
 
-    final schedule = await ScheduleLoader.load();
-    final cert = buildCertificate(rec, schedule);
+    // The record is ALREADY sealed and on disk by this point. A certificate
+    // that cannot be built must therefore not abort the flow: it did, and the
+    // seal looked like it had failed while thirteen records piled up in the
+    // ledger behind an error message. The certificate is derived from the
+    // record and can be regenerated at any time; the record cannot.
+    Certificate? cert;
+    String? certError;
+    try {
+      cert = buildCertificate(rec, await ScheduleLoader.load());
+    } catch (e) {
+      certError = '$e';
+    }
     if (!mounted) return;
     setState(() {
       _certificate = cert;
-      _envelope = buildEnvelope(rec, certificateStatus: cert.status);
+      _certError = certError;
+      _envelope = buildEnvelope(rec, certificateStatus: cert?.status);
       _report = ftr.verifyRecord(ftr.toEnvelope(rec));
       _sealError = null;
       _storedOk = stored;
@@ -694,6 +709,7 @@ class _CaptureFlowState extends State<CaptureFlow> {
             stored: _storedOk,
             storeError: _storeError,
             frameError: _frameError,
+            certError: _certError,
             digestHex: _digestHex,
             // The store owns sequencing once it exists; _sequence is only the
             // in-memory fallback for a platform with no filesystem.

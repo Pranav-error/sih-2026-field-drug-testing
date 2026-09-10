@@ -91,6 +91,15 @@ class DeviceMeasurement {
   final DartDetection? detection;
   final List<double>? lab;
   final double? cardResidual;
+
+  /// The fitted transform, kept so the per-patch residuals can be inspected.
+  ///
+  /// `cardResidual` is its mean and was already exposed; the vector behind that
+  /// mean is what says *why* a fit failed, and diagnosing a refusal from a real
+  /// handset without it meant reconstructing the whole pipeline outside the
+  /// library.
+  final RootPolynomial? transform;
+
   final Prediction? prediction;
   final List<String> refusals;
 
@@ -101,6 +110,7 @@ class DeviceMeasurement {
     this.detection,
     this.lab,
     this.cardResidual,
+    this.transform,
     this.prediction,
   });
 
@@ -403,6 +413,7 @@ DeviceMeasurement measureOnDevice(img.Image src,
         reprojectionPx: reproj, tiltDegrees: quality.tiltDegrees),
     lab: lab,
     cardResidual: transform.residualDeltaE,
+    transform: transform,
     prediction: prediction,
     refusals: refusals,
   );

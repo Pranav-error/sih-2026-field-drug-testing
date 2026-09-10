@@ -577,6 +577,7 @@ class SealedScreen extends StatelessWidget {
     this.stored = false,
     this.storeError,
     this.frameError,
+    this.certError,
   });
 
   final String digestHex;
@@ -596,6 +597,11 @@ class SealedScreen extends StatelessWidget {
   /// The record reached the chain but its frames did not. Reported separately,
   /// because it does not mean the record was lost.
   final String? frameError;
+
+  /// The record sealed but its §63 certificate could not be built. Never fatal:
+  /// the certificate is derived from the record and can be rebuilt; the record
+  /// cannot.
+  final String? certError;
 
   @override
   Widget build(BuildContext context) {
@@ -641,6 +647,18 @@ class SealedScreen extends StatelessWidget {
             ),
           ],
         ]),
+        if (certError != null)
+          Panel(title: 'Certificate not generated', children: [
+            Text(certError!,
+                style: Tokens.monoStyle(size: 10, colour: Tokens.abstain)),
+            const SizedBox(height: 4),
+            const Text(
+              'The record is sealed and in the chain. Only the §63 certificate '
+              'failed, and it is derived from the record — it can be generated '
+              'again at any time.',
+              style: TextStyle(fontSize: 11, height: 1.4, color: Tokens.muted),
+            ),
+          ]),
         Panel(title: 'Signature', children: [
           Measured('Key', securityLevel,
               tone: securityLevel == 'SOFTWARE' ? Tokens.abstain : Tokens.negative),

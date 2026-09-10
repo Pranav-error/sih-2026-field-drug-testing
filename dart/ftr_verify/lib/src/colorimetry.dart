@@ -284,19 +284,78 @@ class RootPolynomial {
     final chroma =
         lab.map((l) => math.sqrt(l[1] * l[1] + l[2] * l[2])).toList();
 
-    double corr(List<double> x) {
-      final n = x.length;
-      final mx = x.reduce((a, b) => a + b) / n;
-      final my = de.reduce((a, b) => a + b) / n;
+    double corr(List<double> x, [List<bool>? mask]) {
+      final xs = <double>[], ds = <double>[];
+      for (var i = 0; i < x.length; i++) {
+        if (mask == null || mask[i]) {
+          xs.add(x[i]);
+          ds.add(de[i]);
+        }
+      }
+      final n = xs.length;
+      if (n < 4) return 0;
+      final mx = xs.reduce((a, b) => a + b) / n;
+      final my = ds.reduce((a, b) => a + b) / n;
       var sxy = 0.0, sxx = 0.0, syy = 0.0;
       for (var i = 0; i < n; i++) {
-        final dx = x[i] - mx, dy = de[i] - my;
+        final dx = xs[i] - mx, dy = ds[i] - my;
         sxy += dx * dy;
         sxx += dx * dx;
         syy += dy * dy;
       }
       if (sxx < 1e-12 || syy < 1e-12) return 0;
       return sxy / math.sqrt(sxx * syy);
+    }
+
+    // Neutral against chromatic first: the sharpest cut the card offers, and
+    // the one a global correlation hides. A real handset frame had 2.8 dE
+    // across the neutrals and 10.1 across the colours, while the lightness
+    // correlation over ALL patches was only -0.47 — the neutrals, being fine,
+    // dragged it under any sane threshold.
+    final chromatic = chroma.map((c) => c > 10).toList();
+    final nChrom = chromatic.where((c) => c).length;
+    final nNeut = chromatic.length - nChrom;
+    if (nChrom >= 4 && nNeut >= 3) {
+      // Medians, not means. The card carries one very dark, nearly-neutral
+      // patch (L 6.8, chroma 5.7) that a grey lift hits hardest of all; on a
+      // real frame it scored 19.7 dE and dragged the neutral MEAN to 4.65 while
+      // the median stayed at 2.6. A mean lets the single worst patch veto the
+      // diagnosis of the effect that produced it.
+      final nVals = <double>[], cVals = <double>[];
+      for (var i = 0; i < de.length; i++) {
+        (chromatic[i] ? cVals : nVals).add(de[i]);
+      }
+      nVals.sort();
+      cVals.sort();
+      final nMean = median(nVals), cMean = median(cVals);
+      if (nMean < 4.0 && cMean > 2 * nMean) {
+        // A grey lift desaturates a dark colour — which a transform with no
+        // constant term cannot undo — while leaving a dark neutral merely
+        // brighter, which the per-channel gain absorbs.
+        final rDark = corr(light, chromatic);
+        if (rDark < -0.4) {
+          return 'the neutral patches are fine (${nMean.toStringAsFixed(1)} dE) '
+              'but the coloured ones are not (${cMean.toStringAsFixed(1)} dE), '
+              'and among those the darker ones are worst '
+              '(r=${rDark.toStringAsFixed(2)}). That is grey light added on top '
+              'of the card — a reflection on glossy paper or a screen, or a '
+              "screen's own black level. Kill the reflections, raise the screen "
+              'brightness, or print the card.';
+        }
+        final rSat = corr(chroma, chromatic);
+        if (rSat > 0.4) {
+          return 'the neutral patches are fine (${nMean.toStringAsFixed(1)} dE) '
+              'and the coloured ones get worse the more saturated they are '
+              '(r=${rSat.toStringAsFixed(2)}) — the colours are being stretched. '
+              "A wide-gamut or 'vivid' display, or colour management left on "
+              'when the card was printed.';
+        }
+        return 'the neutral patches are fine (${nMean.toStringAsFixed(1)} dE) '
+            'but the coloured ones are not (${cMean.toStringAsFixed(1)} dE). '
+            'The greys reproduce and the hues do not, which points at the '
+            "light's spectrum or the display's primaries rather than at "
+            'exposure.';
+      }
     }
 
     final rLight = corr(light), rChroma = corr(chroma);

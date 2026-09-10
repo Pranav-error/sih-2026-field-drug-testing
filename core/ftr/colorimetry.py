@@ -240,10 +240,59 @@ class RootPolynomial:
                     "that is something on the card, not the light: a glare spot, "
                     "a reflection, or an object resting on it.")
 
-        def r(x):
-            if np.std(x) < 1e-9 or np.std(de) < 1e-9:
+        def r(x, mask=None):
+            x = np.asarray(x, dtype=float)
+            d = de
+            if mask is not None:
+                x, d = x[mask], de[mask]
+            if x.size < 4 or np.std(x) < 1e-9 or np.std(d) < 1e-9:
                 return 0.0
-            return float(np.corrcoef(x, de)[0, 1])
+            return float(np.corrcoef(x, d)[0, 1])
+
+        # Neutral against chromatic first, because it is the sharpest cut the
+        # card offers and the one a global correlation hides. A real frame from
+        # a handset had 2.8 dE across the neutrals and 10.1 across the colours,
+        # while the lightness correlation over ALL patches was only -0.47 — the
+        # neutrals, being fine, dragged it under any sane threshold.
+        chromatic = chroma > 10
+        neutral = ~chromatic
+        if chromatic.sum() >= 4 and neutral.sum() >= 3:
+            # Medians, not means. The card carries one very dark, nearly-neutral
+            # patch (L 6.8, chroma 5.7) that a grey lift hits hardest of all; on
+            # a real frame it scored 19.7 dE and dragged the neutral MEAN to 4.65
+            # while the median stayed at 2.6. A mean here lets the single worst
+            # patch veto the diagnosis of the effect that produced it.
+            n_mean = float(np.median(de[neutral]))
+            c_mean = float(np.median(de[chromatic]))
+            if n_mean < 4.0 and c_mean > 2 * n_mean:
+                # Within the chromatic patches, does the error grow as they
+                # darken? A grey lift added on top desaturates a dark colour —
+                # which a transform with no constant term cannot undo — while
+                # leaving a dark neutral merely brighter, which the per-channel
+                # gain absorbs.
+                r_dark = r(lightness, chromatic)
+                if r_dark < -0.4:
+                    return (f"the neutral patches are fine ({n_mean:.1f} dE) but "
+                            f"the coloured ones are not ({c_mean:.1f} dE), and "
+                            f"among those the darker ones are worst "
+                            f"(r={r_dark:+.2f}). That is grey light added on top "
+                            "of the card — a reflection on glossy paper or a "
+                            "screen, or a screen's own black level. Kill the "
+                            "reflections, raise the screen brightness, or print "
+                            "the card.")
+                r_sat = r(chroma, chromatic)
+                if r_sat > 0.4:
+                    return (f"the neutral patches are fine ({n_mean:.1f} dE) and "
+                            "the coloured ones get worse the more saturated they "
+                            f"are (r={r_sat:+.2f}) — the colours are being "
+                            "stretched. A wide-gamut or 'vivid' display, or "
+                            "colour management left on when the card was "
+                            "printed.")
+                return (f"the neutral patches are fine ({n_mean:.1f} dE) but the "
+                        f"coloured ones are not ({c_mean:.1f} dE). The greys "
+                        "reproduce and the hues do not, which points at the "
+                        "light's spectrum or the display's primaries rather "
+                        "than at exposure.")
 
         r_light, r_chroma = r(lightness), r(chroma)
 
