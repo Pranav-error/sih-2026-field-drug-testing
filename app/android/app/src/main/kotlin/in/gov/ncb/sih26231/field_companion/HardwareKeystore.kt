@@ -33,6 +33,11 @@ import java.security.spec.ECGenParameterSpec
  */
 object HardwareKeystore {
     private const val ALIAS = "sih26231.ftr.signing"
+
+    /** Set when an unusable key was replaced, so the app can say so. */
+    @JvmStatic var regenerated = false
+    @JvmStatic var regenerationNote = ""
+    private var lastChallenge: ByteArray? = null
     private const val PROVIDER = "AndroidKeyStore"
 
     /** Result of preparing a key: what backs it, and the attestation chain. */
@@ -58,25 +63,17 @@ object HardwareKeystore {
         val ks = keyStore()
         if (forceRegenerate && ks.containsAlias(ALIAS)) ks.deleteEntry(ALIAS)
 
+        lastChallenge = challenge
         var strongBox = true
         var note = ""
         if (!ks.containsAlias(ALIAS)) {
-            try {
-                generate(challenge, useStrongBox = true)
-            } catch (e: StrongBoxUnavailableException) {
-                // Not an error: many issued handsets have no discrete secure
-                // element. Fall back, and let the record carry the weaker level.
-                strongBox = false
+            strongBox = generateBestAvailable(challenge)
+            if (!strongBox) {
                 note = "StrongBox unavailable on this device; the key was " +
                     "generated in the TEE, which is a weaker guarantee."
-                generate(challenge, useStrongBox = false)
-            } catch (e: Exception) {
-                strongBox = false
-                note = "StrongBox generation failed (${e.javaClass.simpleName}); " +
-                    "the key was generated in the TEE."
-                generate(challenge, useStrongBox = false)
             }
         }
+        if (regenerated) note = regenerationNote
 
         val entry = ks.getEntry(ALIAS, null) as KeyStore.PrivateKeyEntry
         val chain = entry.certificateChain.map {
@@ -111,6 +108,22 @@ object HardwareKeystore {
                 entry.certificate.publicKey.encoded, Base64.NO_WRAP),
             note = note,
         )
+    }
+
+    /** Generate in StrongBox, falling back to the TEE. True if StrongBox. */
+    private fun generateBestAvailable(challenge: ByteArray): Boolean {
+        return try {
+            generate(challenge, useStrongBox = true)
+            true
+        } catch (e: StrongBoxUnavailableException) {
+            // Not an error: many issued handsets have no discrete secure
+            // element. Fall back, and let the record carry the weaker level.
+            generate(challenge, useStrongBox = false)
+            false
+        } catch (e: Exception) {
+            generate(challenge, useStrongBox = false)
+            false
+        }
     }
 
     private fun generate(challenge: ByteArray, useStrongBox: Boolean) {
@@ -170,7 +183,36 @@ object HardwareKeystore {
      * it unchanged. Nothing above this line had to move.
      */
     fun sign(body: ByteArray): ByteArray {
-        val entry = keyStore().getEntry(ALIAS, null) as KeyStore.PrivateKeyEntry
+        try {
+            return signWith(ALIAS, body)
+        } catch (e: java.security.InvalidKeyException) {
+            // A key left by an older build whose parameters no longer match how
+            // this build signs. Until now the only cure was uninstalling the
+            // app, which also destroyed the ledger — so every fix shipped with
+            // "delete it first", and testers stopped being able to carry records
+            // across builds.
+            //
+            // Regenerating is safe here and nowhere else: this key signs future
+            // records, it does not decrypt past ones. Records already sealed
+            // carry their own public key and attestation chain, so they keep
+            // verifying against the key that signed them. What is lost is the
+            // continuity claim that one device signed the whole chain — and the
+            // chain check reports that itself, as a foreign_key break, rather
+            // than it passing silently.
+            regenerated = true
+            regenerationNote = "The signing key was replaced: the previous one " +
+                "was created by an older build and this build cannot sign with " +
+                "it (${e.javaClass.simpleName}). Records sealed before this " +
+                "point still verify, but the chain now spans two keys and the " +
+                "verifier reports that."
+            keyStore().deleteEntry(ALIAS)
+            generateBestAvailable(lastChallenge ?: ByteArray(32))
+            return signWith(ALIAS, body)
+        }
+    }
+
+    private fun signWith(alias: String, body: ByteArray): ByteArray {
+        val entry = keyStore().getEntry(alias, null) as KeyStore.PrivateKeyEntry
         return Signature.getInstance("SHA256withECDSA").run {
             initSign(entry.privateKey)
             update(body)

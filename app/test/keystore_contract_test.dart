@@ -67,6 +67,19 @@ void main() {
     expect(src, contains('val level = reportedLevel(entry.privateKey)'));
   });
 
+  test('a stale key is regenerated rather than requiring an uninstall', () {
+    // Until this, an InvalidKeyException from a key an older build left behind
+    // could only be cured by uninstalling — which also destroyed the ledger, so
+    // every fix shipped with "delete it first" and no chain survived two builds.
+    expect(src, contains('catch (e: java.security.InvalidKeyException)'));
+    expect(src, contains('keyStore().deleteEntry(ALIAS)'));
+    // And it must SAY it happened: the chain now spans two keys, which the
+    // verifier reports as a foreign_key break, and an operator should not meet
+    // that for the first time in a courtroom.
+    expect(src, contains('regenerationNote'));
+    expect(src, contains('two keys'));
+  });
+
   test('MainActivity passes the body under that name', () {
     final main = File('android/app/src/main/kotlin/in/gov/ncb/sih26231/'
         'field_companion/MainActivity.kt');

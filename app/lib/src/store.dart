@@ -62,9 +62,8 @@ class RecordStore {
 
   /// Digest of the last record, or the genesis hash on an empty chain.
   Uint8List get head {
-    final files = _files;
-    if (files.isEmpty) return ftr.genesisHash;
-    return ftr.SealedRecord.fromEnvelope(files.last.readAsBytesSync()).digest;
+    final recs = records();
+    return recs.isEmpty ? ftr.genesisHash : recs.last.digest;
   }
 
   int get nextSequence => _files.length;
@@ -125,9 +124,28 @@ class RecordStore {
 
   List<ftr.SealedRecord> records() => _cachedRecords ??= _readRecords();
 
-  List<ftr.SealedRecord> _readRecords() => _files
-      .map((f) => ftr.SealedRecord.fromEnvelope(f.readAsBytesSync()))
-      .toList();
+  /// Files that exist but this build cannot parse — written by an older or
+  /// newer schema. Reported, never deleted.
+  final List<String> unreadable = [];
+
+  List<ftr.SealedRecord> _readRecords() {
+    // One unparseable file must not take the whole log down with it. Before
+    // this, upgrading the app over an existing ledger risked an exception on
+    // every screen that listed records, and the only cure was uninstalling —
+    // which destroyed the very records the ledger exists to keep.
+    unreadable.clear();
+    final out = <ftr.SealedRecord>[];
+    for (final f in _files) {
+      try {
+        out.add(ftr.SealedRecord.fromEnvelope(f.readAsBytesSync()));
+      } catch (e) {
+        unreadable.add('${f.uri.pathSegments.last}: $e');
+      }
+    }
+    return out;
+  }
+
+
 
   /// Write the frames a record refers to, beside it.
   ///
@@ -242,6 +260,10 @@ class RecordStore {
         }
       }
       prev = r.digest;
+    }
+    for (final u in unreadable) {
+      breaks.add('$u — this build cannot read that record; it has NOT been '
+          'deleted, and a build that understands it still can');
     }
     return (intact: breaks.isEmpty, breaks: breaks);
   }

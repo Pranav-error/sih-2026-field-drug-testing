@@ -253,6 +253,16 @@ Two things the cards taught us, both fixed and both tested:
 ./build-apk.sh                                       # the whole pipeline runs on the handset
 ```
 
+**Installing over an existing build keeps the records.** `./install.sh` builds
+and pushes with `adb install -r -d`; no uninstall, and the ledger survives.
+`--run` streams the logs, `--wipe` is the old destructive path for when a clean
+slate is actually what you want. Earlier builds all shipped with "uninstall
+first", which also destroyed the chain — so no ledger survived two builds and
+every test session restarted from zero. The two causes are fixed in the app: a
+signing key an older build left behind is regenerated on use (and the record
+says the chain now spans two keys), and a record this build cannot parse is
+reported as a break rather than thrown.
+
 **Always build with `build-apk.sh`, never `flutter build apk` directly.** It
 stamps the commit into the binary and names the file after it. Without that a
 build has no identity: several APKs went out all called "v10", built from
