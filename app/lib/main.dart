@@ -338,10 +338,14 @@ class _CaptureFlowState extends State<CaptureFlow> {
     // No fallback. Sealing a canned result would put a measurement into the
     // record that no camera produced — the one thing an evidentiary record must
     // never do.
+    //
+    // But a refusal IS sealable, and must be. A frame the instrument would not
+    // read is evidence too, and letting an operator retake until they like the
+    // answer — with the rejected frames leaving no trace — is precisely the
+    // attack the ledger exists to stop. Removing the canned fallback took this
+    // with it for one build: the gate offered "Seal the refusal" and the next
+    // screen had only a Retake button.
     final shown = _live?.result;
-    if (shown == null) {
-      throw StateError('nothing was measured on this frame — retake it');
-    }
     // Read the position at the moment of sealing, not at app start.
     final fix = await LocationReader.read();
     // Now the standby screen can stop saying "not checked yet" about a thing
@@ -384,22 +388,28 @@ class _CaptureFlowState extends State<CaptureFlow> {
       // the one thing an evidentiary record must never do.
       colorimetry: {
         'measured': _live?.detected ?? false,
-        if (shown.lab != null)
-          'lab_x100': shown.lab!.map((v) => (v * 100).round()).toList(),
+        if (shown?.lab != null)
+          'lab_x100': shown!.lab!.map((v) => (v * 100).round()).toList(),
         if (_live?.cardResidual != null)
           'card_residual_x1000': (_live!.cardResidual! * 1000).round(),
         'gate_passed': _live?.gatePassed ?? false,
         'refusals': _live?.refusals ?? const <String>[],
       },
-      classification: {
-        'alpha_x1000': (shown.alpha * 1000).round(),
-        'threshold_x1000': (shown.threshold * 1000).round(),
-        'prediction_set': shown.predictionSet,
-        'label': shown.label,
-        'scores_x1000': {
-          for (final e in shown.scores.entries) e.key: (e.value * 1000).round(),
-        },
-      },
+      // A refusal carries no classification, and says so rather than carrying
+      // an empty one that reads like a negative result.
+      classification: shown == null
+          ? const {'measured': false}
+          : {
+              'measured': true,
+              'alpha_x1000': (shown.alpha * 1000).round(),
+              'threshold_x1000': (shown.threshold * 1000).round(),
+              'prediction_set': shown.predictionSet,
+              'label': shown.label,
+              'scores_x1000': {
+                for (final e in shown.scores.entries)
+                  e.key: (e.value * 1000).round(),
+              },
+            },
       // The measured liveness, or an explicit "not checked" — never a default
       // that would read as having passed.
       liveness: _livenessRecord(),

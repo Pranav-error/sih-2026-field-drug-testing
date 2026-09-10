@@ -10,6 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:field_companion/main.dart';
 import 'package:field_companion/src/screens.dart';
 import 'package:field_companion/src/screens_extra.dart';
+import 'package:field_companion/src/tokens.dart';
+
+Widget wrap(Widget child) =>
+    MaterialApp(theme: buildTheme(Brightness.light), home: child);
 
 void main() {
   testWidgets('Begin field test goes to setup, NOT to the camera', (t) async {
@@ -63,6 +67,37 @@ void main() {
     await t.pumpWidget(const FieldCompanionApp());
     await t.pump();
     expect(find.textContaining('unstamped build'), findsOneWidget);
+  });
+
+  testWidgets('a refused frame can still be sealed', (t) async {
+    // The design property: "a frame the instrument would not read is evidence
+    // too, and deleting it is the attack the ledger exists to stop." Removing
+    // the canned-result fallback took this with it for one build — the gate
+    // offered "Seal the refusal" and the next screen had only Retake.
+    var sealed = false;
+    await t.pumpWidget(wrap(ResultScreen(
+      result: null,
+      refusals: const ["the card's own patches did not reproduce (9.32 dE)"],
+      guidance: 'Hold steady.',
+      onSeal: () => sealed = true,
+      onRetake: () {},
+    )));
+
+    expect(find.text('Seal the refusal'), findsOneWidget);
+    expect(find.text('Retake the frame'), findsOneWidget);
+    await t.tap(find.text('Seal the refusal'));
+    expect(sealed, isTrue);
+  });
+
+  testWidgets('a refusal screen still says it is not a result', (t) async {
+    await t.pumpWidget(wrap(ResultScreen(
+      result: null,
+      refusals: const ['refused on something'],
+      onSeal: () {},
+      onRetake: () {},
+    )));
+    expect(find.textContaining('absence of one'), findsOneWidget);
+    expect(find.textContaining('not a reading'), findsOneWidget);
   });
 
   testWidgets('the setup screen says which step of the flow it is', (t) async {

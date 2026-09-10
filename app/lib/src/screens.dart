@@ -444,7 +444,27 @@ class ResultScreen extends StatelessWidget {
                 'NDPS procedure remains required.',
           ),
         ],
-        footer: [PrimaryButton('Retake the frame', onPressed: onRetake)],
+        footer: [
+          // A refusal is sealable, and offered first. An operator who can only
+          // retake will retake until they like the answer, and the rejected
+          // frames leave no trace — the attack the ledger exists to stop.
+          PrimaryButton('Seal the refusal', onPressed: onSeal),
+          const SizedBox(height: 8),
+          PrimaryButton.ghost('Retake the frame', onPressed: onRetake),
+          const SizedBox(height: 8),
+          const Text(
+            'Sealing keeps this frame and the reason it was refused. It is a '
+            'record that no reading was obtained, not a reading.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, height: 1.4, color: Tokens.muted),
+          ),
+          if (sealError != null) ...[
+            const SizedBox(height: 8),
+            Text(sealError!,
+                textAlign: TextAlign.center,
+                style: Tokens.monoStyle(size: 10, colour: Tokens.negative)),
+          ],
+        ],
       );
 
   Widget _measured(BuildContext context, TestResult result) {
